@@ -192,7 +192,7 @@ Ranked by reduction in hallucinations:
 
 ## Extracted Metadata
 
-**Sections (##):**
+**Sections:**
 - Summary - Counts
 - Architecture Patterns - Auto-detected (*Repository, *Entities, *Services, *Controllers, etc.)
 - Constants & Magic Values - Literals, array keys
@@ -200,7 +200,7 @@ Ranked by reduction in hallucinations:
 - Namespace Structure - Organized by namespace
 - Classes/Interfaces/Traits/Enums - Detailed definitions
 
-**Per Class (**):**
+**Per Class:**
 ```
 Description, Annotations, FQCN, Inheritance,
 Type Dependencies, Constructor Injection, Public API,
