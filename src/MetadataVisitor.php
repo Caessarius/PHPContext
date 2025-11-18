@@ -766,12 +766,14 @@ class MetadataVisitor extends NodeVisitorAbstract
             }
             
             // Recursively scan nested statements
-            $properties = get_object_vars($stmt);
-            foreach ($properties as $prop) {
-                if (is_array($prop)) {
-                    $this->scanStatements($prop, $serviceCalls, $assignments, $throws, $returns, $controlFlow);
-                } elseif ($prop instanceof Node) {
-                    $this->scanStatements([$prop], $serviceCalls, $assignments, $throws, $returns, $controlFlow);
+            if ($stmt !== null && is_object($stmt)) {
+                $properties = get_object_vars($stmt);
+                foreach ($properties as $prop) {
+                    if (is_array($prop)) {
+                        $this->scanStatements($prop, $serviceCalls, $assignments, $throws, $returns, $controlFlow);
+                    } elseif ($prop instanceof Node) {
+                        $this->scanStatements([$prop], $serviceCalls, $assignments, $throws, $returns, $controlFlow);
+                    }
                 }
             }
         }
