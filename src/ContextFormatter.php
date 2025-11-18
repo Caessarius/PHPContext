@@ -59,6 +59,7 @@ class ContextFormatter
                 'max_magic_strings' => 15,
                 'max_magic_numbers' => 10,
                 'max_array_keys' => 15,
+                'max_body_patterns_service_calls' => 10,
             ],
         ];
         
@@ -593,11 +594,32 @@ class ContextFormatter
             // Service calls
             if ($this->options['body_patterns']['service_calls'] && !empty($method['body_patterns']['service_calls'])) {
                 foreach ($method['body_patterns']['service_calls'] as $service => $calls) {
-                    $callList = array_slice($calls, 0, 3);
-                    $output[] = "  → `\$this->{$service}`: " . implode(', ', $callList);
-                    if (count($calls) > 3) {
-                        $output[count($output) - 1] .= ', +' . (count($calls) - 3);
+                    // Group and count identical calls
+                    $callCounts = array_count_values($calls);
+
+                    // Sort by count descending
+                    arsort($callCounts);
+
+                    // Apply limit
+                    $limit = $this->options['limits']['max_body_patterns_service_calls'];
+                    $limitedCalls = array_slice($callCounts, 0, $limit, true);
+
+                    // Format as "N* method()"
+                    $formattedCalls = [];
+                    foreach ($limitedCalls as $call => $count) {
+                        if ($count > 1) {
+                            $formattedCalls[] = "{$count}× {$call}";
+                        } else {
+                            $formattedCalls[] = $call;
+                        }
                     }
+
+                    $callsLine = implode(', ', $formattedCalls);
+                    if (count($callCounts) > $limit) {
+                        $callsLine .= ', ...';
+                    }
+
+                    $output[] = "  → `\$this->{$service}`: {$callsLine}";
                 }
             }
             

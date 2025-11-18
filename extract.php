@@ -115,6 +115,7 @@ $config = [
             'max_magic_strings' => 15,
             'max_magic_numbers' => 10,
             'max_array_keys' => 15,
+            'max_body_patterns_service_calls' => 10,
         ],
     ],
 ];
@@ -131,6 +132,7 @@ for ($i = 3; $i < $argc; $i++) {
             'max_magic_strings' => PHP_INT_MAX,
             'max_magic_numbers' => PHP_INT_MAX,
             'max_array_keys' => PHP_INT_MAX,
+            'max_body_patterns_service_calls' => PHP_INT_MAX,
         ];
         $config['options']['files_analyzed'] = true;
     } elseif (str_starts_with($argv[$i], '--exclude=')) {
