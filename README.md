@@ -77,10 +77,10 @@ scripts/phpcontext/extract.php src/ CONTEXT.md --exclude=Migrations/
 scripts/phpcontext/extract.php /path/to/project CONTEXT.md --exclude=migrations/ --exclude=fixtures/
 
 # Drupal custom modules
-scripts/context-extractor/extract-context.php web/modules/custom CUSTOM_CONTEXT.md
+scripts/phpcontext/extract.php web/modules/custom CUSTOM_CONTEXT.md
 
 # Drupal specific module
-scripts/context-extractor/extract-context.php web/modules/custom/my_module MODULE_CONTEXT.md
+scripts/phpcontext/extract.php web/modules/custom/my_module MODULE_CONTEXT.md
 ```
 
 
@@ -88,31 +88,68 @@ scripts/context-extractor/extract-context.php web/modules/custom/my_module MODUL
 
 ```php
 'options' => [
-    // Sections (##)
+    // Top-level sections
     'summary' => true,
     'architecture_patterns' => true,
     'constants_magic_values' => true,
     'key_dependencies' => true,
+    'namespace_structure' => true,
+    'files_analyzed' => false,
 
-    // Class details (**)
-    'class_details' => [
-        'plugin_annotations' => true,  // Drupal @Plugin
-        'type_dependencies' => true,
-        'public_api' => true,
-        'constructor_injection' => true,
+    // Constants & Magic Values subsections
+    'magic_values' => [
+        'class_constants' => true,
+        'magic_strings' => true,
+        'magic_numbers' => true,
+        'array_keys' => true,
     ],
 
-    // Method patterns
+    // Class-level details
+    'class_details' => [
+        'docblock_summary' => true,
+        'plugin_annotations' => true,
+        'attributes' => true,
+        'inheritance' => true,
+        'type_dependencies' => true,
+        'constructor_injection' => true,
+        'public_api' => true,
+        'constants' => true,
+        'properties' => true,
+        'methods' => true,
+    ],
+
+    // Method-level details
+    'method_details' => [
+        'docblock_summary' => true,
+        'attributes' => true,
+        'parameters' => true,
+        'return_type' => true,
+        'body_patterns' => true,
+    ],
+
+    // Method body patterns
     'body_patterns' => [
-        'service_calls' => true,       // $this->service->method()
+        'service_calls' => true,
         'throws' => true,
         'control_flow' => true,
+        'returns' => true,
+    ],
+
+    // Property details
+    'property_details' => [
+        'docblock_summary' => true,
+        'default_values' => true,
     ],
 
     // Limits
     'limits' => [
         'max_methods_per_class' => PHP_INT_MAX,
         'max_properties_per_class' => 15,
+        'max_pattern_classes' => 20,
+        'max_dependencies' => 15,
+        'max_magic_strings' => 15,
+        'max_magic_numbers' => 10,
+        'max_array_keys' => 15,
     ],
 ];
 ```
@@ -150,7 +187,7 @@ Automatically detects common patterns:
 ]
 ```
 
-**Oro Platform:**
+**OroPlatform:**
 ```php
 'limits' => [
     'max_methods_per_class' => 10,
