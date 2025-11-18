@@ -194,7 +194,7 @@ Ranked by reduction in hallucinations:
 
 **Sections:**
 - Summary - Counts
-- Architecture Patterns - Auto-detected (*Repository, *Entities, *Services, *Controllers, etc.)
+- Architecture Patterns - Auto-detected (Repository, Entities, Services, Controllers, etc.)
 - Constants & Magic Values - Literals, array keys
 - Key Dependencies - Classes/interfaces usage ranking
 - Namespace Structure - Organized by namespace
