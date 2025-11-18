@@ -503,7 +503,7 @@ class ContextFormatter
             $output[] = "";
             $output[] = "**Methods:**";
             foreach ($trait['methods'] as $method) {
-                $output[] = $this->formatMethodSignature($method);
+                $output = array_merge($output, $this->formatMethodSignature($method));
             }
         }
         
