@@ -457,12 +457,14 @@ class MetadataVisitor extends NodeVisitorAbstract
             }
             
             // Recursively scan nested nodes
-            $properties = get_object_vars($stmt);
-            foreach ($properties as $prop) {
-                if (is_array($prop)) {
-                    $this->findMagicValues($prop, $magicValues);
-                } elseif ($prop instanceof Node) {
-                    $this->findMagicValues([$prop], $magicValues);
+            if ($stmt !== null && is_object($stmt)) {
+                $properties = get_object_vars($stmt);
+                foreach ($properties as $prop) {
+                    if (is_array($prop)) {
+                        $this->findMagicValues($prop, $magicValues);
+                    } elseif ($prop instanceof Node) {
+                        $this->findMagicValues([$prop], $magicValues);
+                    }
                 }
             }
         }
@@ -476,12 +478,14 @@ class MetadataVisitor extends NodeVisitorAbstract
             }
 
             // Recursively check nested statements
-            $properties = get_object_vars($stmt);
-            foreach ($properties as $prop) {
-                if (is_array($prop)) {
-                    $this->findInstanceOf($prop, $deps);
-                } elseif ($prop instanceof Node) {
-                    $this->findInstanceOf([$prop], $deps);
+            if ($stmt !== null && is_object($stmt)) {
+                $properties = get_object_vars($stmt);
+                foreach ($properties as $prop) {
+                    if (is_array($prop)) {
+                        $this->findInstanceOf($prop, $deps);
+                    } elseif ($prop instanceof Node) {
+                        $this->findInstanceOf([$prop], $deps);
+                    }
                 }
             }
         }
