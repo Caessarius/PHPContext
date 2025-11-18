@@ -426,44 +426,117 @@ class MetadataVisitor extends NodeVisitorAbstract
     private function findMagicValues(array $stmts, array &$magicValues): void
     {
         foreach ($stmts as $stmt) {
-            // String literals in various contexts
-            if ($stmt instanceof Node\Scalar\String_) {
-                $value = $stmt->value;
-                // Filter out very long strings and URLs
-                if (strlen($value) < 50 && !preg_match('#^https?://#', $value)) {
-                    $magicValues['strings'][] = $value;
+            if ($stmt === null) {
+                continue;
+            }
+
+            $this->scanNodeForMagicValues($stmt, $magicValues);
+        }
+    }
+
+    private function scanNodeForMagicValues(Node $node, array &$magicValues): void
+    {
+        // String literals in various contexts
+        if ($node instanceof Node\Scalar\String_) {
+            $value = $node->value;
+            // Filter out very long strings and URLs
+            if (strlen($value) < 50 && !preg_match('#^https?://#', $value)) {
+                $magicValues['strings'][] = $value;
+            }
+        }
+
+        // Numeric literals (excluding common ones)
+        if ($node instanceof Node\Scalar\Int_ || $node instanceof Node\Scalar\Float_) {
+            $magicValues['numbers'][] = (string)$node->value;
+        }
+
+        // Array key access
+        if ($node instanceof Node\Expr\ArrayDimFetch) {
+            if ($node->dim instanceof Node\Scalar\String_) {
+                $magicValues['array_keys'][] = $node->dim->value;
+            }
+            // Recurse into the array variable
+            if ($node->var instanceof Node) {
+                $this->scanNodeForMagicValues($node->var, $magicValues);
+            }
+        }
+
+        // Array keys in assignments
+        if ($node instanceof Node\Expr\Array_) {
+            foreach ($node->items as $item) {
+                if ($item && $item->key instanceof Node\Scalar\String_) {
+                    $magicValues['array_keys'][] = $item->key->value;
+                }
+                if ($item && $item->value instanceof Node) {
+                    $this->scanNodeForMagicValues($item->value, $magicValues);
                 }
             }
-            
-            // Numeric literals (excluding common ones)
-            if ($stmt instanceof Node\Scalar\Int_ || $stmt instanceof Node\Scalar\Float_) {
-                $magicValues['numbers'][] = (string)$stmt->value;
+        }
+
+        // Recurse into statement containers only
+        if ($node instanceof Node\Stmt\If_) {
+            if ($node->stmts) {
+                $this->findMagicValues($node->stmts, $magicValues);
             }
-            
-            // Array key access
-            if ($stmt instanceof Node\Expr\ArrayDimFetch) {
-                if ($stmt->dim instanceof Node\Scalar\String_) {
-                    $magicValues['array_keys'][] = $stmt->dim->value;
-                }
-            }
-            
-            // Array keys in assignments
-            if ($stmt instanceof Node\Expr\Array_) {
-                foreach ($stmt->items as $item) {
-                    if ($item && $item->key instanceof Node\Scalar\String_) {
-                        $magicValues['array_keys'][] = $item->key->value;
+            if ($node->elseifs) {
+                foreach ($node->elseifs as $elseif) {
+                    if ($elseif->stmts) {
+                        $this->findMagicValues($elseif->stmts, $magicValues);
                     }
                 }
             }
-            
-            // Recursively scan nested nodes
-            if ($stmt !== null && is_object($stmt)) {
-                $properties = get_object_vars($stmt);
-                foreach ($properties as $prop) {
-                    if (is_array($prop)) {
-                        $this->findMagicValues($prop, $magicValues);
-                    } elseif ($prop instanceof Node) {
-                        $this->findMagicValues([$prop], $magicValues);
+            if ($node->else && $node->else->stmts) {
+                $this->findMagicValues($node->else->stmts, $magicValues);
+            }
+        } elseif ($node instanceof Node\Stmt\Foreach_ || $node instanceof Node\Stmt\For_ ||
+                  $node instanceof Node\Stmt\While_ || $node instanceof Node\Stmt\Do_) {
+            if ($node->stmts) {
+                $this->findMagicValues($node->stmts, $magicValues);
+            }
+        } elseif ($node instanceof Node\Stmt\Switch_) {
+            if ($node->cases) {
+                foreach ($node->cases as $case) {
+                    if ($case->stmts) {
+                        $this->findMagicValues($case->stmts, $magicValues);
+                    }
+                }
+            }
+        } elseif ($node instanceof Node\Stmt\TryCatch) {
+            if ($node->stmts) {
+                $this->findMagicValues($node->stmts, $magicValues);
+            }
+            if ($node->catches) {
+                foreach ($node->catches as $catch) {
+                    if ($catch->stmts) {
+                        $this->findMagicValues($catch->stmts, $magicValues);
+                    }
+                }
+            }
+            if ($node->finally && $node->finally->stmts) {
+                $this->findMagicValues($node->finally->stmts, $magicValues);
+            }
+        } elseif ($node instanceof Node\Stmt\Expression) {
+            // Scan the expression inside
+            if ($node->expr instanceof Node) {
+                $this->scanNodeForMagicValues($node->expr, $magicValues);
+            }
+        } elseif ($node instanceof Node\Stmt\Return_ || $node instanceof Node\Stmt\Throw_) {
+            // Scan the expression being returned or thrown
+            if ($node->expr instanceof Node) {
+                $this->scanNodeForMagicValues($node->expr, $magicValues);
+            }
+        } elseif ($node instanceof Node\Expr\Assign) {
+            // Scan the right side of assignment
+            if ($node->expr instanceof Node) {
+                $this->scanNodeForMagicValues($node->expr, $magicValues);
+            }
+        } elseif ($node instanceof Node\Expr\MethodCall || $node instanceof Node\Expr\FuncCall ||
+                  $node instanceof Node\Expr\StaticCall) {
+            // Scan arguments for magic values
+            if ($node->args) {
+                foreach ($node->args as $arg) {
+                    if ($arg->value instanceof Node) {
+                        $this->scanNodeForMagicValues($arg->value, $magicValues);
                     }
                 }
             }
@@ -473,20 +546,95 @@ class MetadataVisitor extends NodeVisitorAbstract
     private function findInstanceOf(array $stmts, array &$deps): void
     {
         foreach ($stmts as $stmt) {
-            if ($stmt instanceof Node\Expr\Instanceof_ && $stmt->class instanceof Node\Name) {
-                $deps[] = $this->resolveName($stmt->class);
+            if ($stmt === null) {
+                continue;
             }
 
-            // Recursively check nested statements
-            if ($stmt !== null && is_object($stmt)) {
-                $properties = get_object_vars($stmt);
-                foreach ($properties as $prop) {
-                    if (is_array($prop)) {
-                        $this->findInstanceOf($prop, $deps);
-                    } elseif ($prop instanceof Node) {
-                        $this->findInstanceOf([$prop], $deps);
+            $this->scanNodeForInstanceOf($stmt, $deps);
+        }
+    }
+
+    private function scanNodeForInstanceOf(Node $node, array &$deps): void
+    {
+        // Check if this is an instanceof expression
+        if ($node instanceof Node\Expr\Instanceof_ && $node->class instanceof Node\Name) {
+            $deps[] = $this->resolveName($node->class);
+        }
+
+        // Recurse into statement containers only
+        if ($node instanceof Node\Stmt\If_) {
+            if ($node->stmts) {
+                $this->findInstanceOf($node->stmts, $deps);
+            }
+            if ($node->elseifs) {
+                foreach ($node->elseifs as $elseif) {
+                    if ($elseif->stmts) {
+                        $this->findInstanceOf($elseif->stmts, $deps);
                     }
                 }
+            }
+            if ($node->else && $node->else->stmts) {
+                $this->findInstanceOf($node->else->stmts, $deps);
+            }
+            // Check the condition expression as well
+            if ($node->cond instanceof Node) {
+                $this->scanNodeForInstanceOf($node->cond, $deps);
+            }
+        } elseif ($node instanceof Node\Stmt\Foreach_ || $node instanceof Node\Stmt\For_ ||
+                  $node instanceof Node\Stmt\While_ || $node instanceof Node\Stmt\Do_) {
+            if ($node->stmts) {
+                $this->findInstanceOf($node->stmts, $deps);
+            }
+        } elseif ($node instanceof Node\Stmt\Switch_) {
+            if ($node->cases) {
+                foreach ($node->cases as $case) {
+                    if ($case->stmts) {
+                        $this->findInstanceOf($case->stmts, $deps);
+                    }
+                }
+            }
+        } elseif ($node instanceof Node\Stmt\TryCatch) {
+            if ($node->stmts) {
+                $this->findInstanceOf($node->stmts, $deps);
+            }
+            if ($node->catches) {
+                foreach ($node->catches as $catch) {
+                    if ($catch->stmts) {
+                        $this->findInstanceOf($catch->stmts, $deps);
+                    }
+                }
+            }
+            if ($node->finally && $node->finally->stmts) {
+                $this->findInstanceOf($node->finally->stmts, $deps);
+            }
+        } elseif ($node instanceof Node\Stmt\Expression) {
+            // Scan the expression inside
+            if ($node->expr instanceof Node) {
+                $this->scanNodeForInstanceOf($node->expr, $deps);
+            }
+        } elseif ($node instanceof Node\Stmt\Return_ || $node instanceof Node\Stmt\Throw_) {
+            // Scan the expression being returned or thrown
+            if ($node->expr instanceof Node) {
+                $this->scanNodeForInstanceOf($node->expr, $deps);
+            }
+        } elseif ($node instanceof Node\Expr\BinaryOp) {
+            // For binary operations (including instanceof), check both sides
+            if ($node->left instanceof Node) {
+                $this->scanNodeForInstanceOf($node->left, $deps);
+            }
+            if ($node->right instanceof Node) {
+                $this->scanNodeForInstanceOf($node->right, $deps);
+            }
+        } elseif ($node instanceof Node\Expr\Ternary) {
+            // Check ternary condition and branches
+            if ($node->cond instanceof Node) {
+                $this->scanNodeForInstanceOf($node->cond, $deps);
+            }
+            if ($node->if instanceof Node) {
+                $this->scanNodeForInstanceOf($node->if, $deps);
+            }
+            if ($node->else instanceof Node) {
+                $this->scanNodeForInstanceOf($node->else, $deps);
             }
         }
     }
@@ -704,6 +852,10 @@ class MetadataVisitor extends NodeVisitorAbstract
     private function scanStatements(array $stmts, array &$serviceCalls, array &$assignments, array &$throws, array &$returns, array &$controlFlow): void
     {
         foreach ($stmts as $stmt) {
+            if ($stmt === null) {
+                continue;
+            }
+
             // Throw statements
             if ($stmt instanceof Node\Stmt\Throw_) {
                 if ($stmt->expr instanceof Node\Expr\New_) {
@@ -712,7 +864,7 @@ class MetadataVisitor extends NodeVisitorAbstract
                     }
                 }
             }
-            
+
             // Return statements
             if ($stmt instanceof Node\Stmt\Return_) {
                 if ($stmt->expr instanceof Node\Expr\Variable && is_string($stmt->expr->name)) {
@@ -721,62 +873,106 @@ class MetadataVisitor extends NodeVisitorAbstract
                     $returns[] = 'return method call';
                 } elseif ($stmt->expr instanceof Node\Expr\Array_) {
                     $returns[] = 'return array';
-                } elseif ($stmt->expr instanceof Node\Scalar\String_ || 
+                } elseif ($stmt->expr instanceof Node\Scalar\String_ ||
                           $stmt->expr instanceof Node\Scalar\Int_ ||
                           $stmt->expr instanceof Node\Expr\ConstFetch) {
                     $returns[] = 'return value';
                 }
             }
-            
+
             // Loops
             if ($stmt instanceof Node\Stmt\Foreach_) {
                 $controlFlow[] = 'foreach';
+                if ($stmt->stmts) {
+                    $this->scanStatements($stmt->stmts, $serviceCalls, $assignments, $throws, $returns, $controlFlow);
+                }
             } elseif ($stmt instanceof Node\Stmt\For_) {
                 $controlFlow[] = 'for';
+                if ($stmt->stmts) {
+                    $this->scanStatements($stmt->stmts, $serviceCalls, $assignments, $throws, $returns, $controlFlow);
+                }
             } elseif ($stmt instanceof Node\Stmt\While_) {
                 $controlFlow[] = 'while';
+                if ($stmt->stmts) {
+                    $this->scanStatements($stmt->stmts, $serviceCalls, $assignments, $throws, $returns, $controlFlow);
+                }
+            } elseif ($stmt instanceof Node\Stmt\Do_) {
+                $controlFlow[] = 'do-while';
+                if ($stmt->stmts) {
+                    $this->scanStatements($stmt->stmts, $serviceCalls, $assignments, $throws, $returns, $controlFlow);
+                }
             }
-            
+
             // Conditionals
             if ($stmt instanceof Node\Stmt\If_) {
                 $controlFlow[] = 'if';
+                if ($stmt->stmts) {
+                    $this->scanStatements($stmt->stmts, $serviceCalls, $assignments, $throws, $returns, $controlFlow);
+                }
+                if ($stmt->elseifs) {
+                    foreach ($stmt->elseifs as $elseif) {
+                        if ($elseif->stmts) {
+                            $this->scanStatements($elseif->stmts, $serviceCalls, $assignments, $throws, $returns, $controlFlow);
+                        }
+                    }
+                }
+                if ($stmt->else && $stmt->else->stmts) {
+                    $this->scanStatements($stmt->else->stmts, $serviceCalls, $assignments, $throws, $returns, $controlFlow);
+                }
             } elseif ($stmt instanceof Node\Stmt\Switch_) {
                 $controlFlow[] = 'switch';
-            }
-            
-            // Service calls like $this->service->method()
-            if ($stmt instanceof Node\Expr\MethodCall) {
-                if ($stmt->var instanceof Node\Expr\PropertyFetch) {
-                    $prop = $stmt->var->name instanceof Node\Identifier ? 
-                        $stmt->var->name->toString() : '?';
-                    $method = $stmt->name instanceof Node\Identifier ? 
-                        $stmt->name->toString() : '?';
-                    $serviceCalls[] = '$this->' . $prop . '->' . $method . '()';
-                }
-            }
-            
-            // Assignments
-            if ($stmt instanceof Node\Expr\Assign) {
-                if ($stmt->var instanceof Node\Expr\Variable && is_string($stmt->var->name)) {
-                    $varName = $stmt->var->name;
-                    if ($stmt->expr instanceof Node\Expr\MethodCall) {
-                        $assignments[] = '$' . $varName . ' = ...';
-                    } elseif ($stmt->expr instanceof Node\Expr\New_) {
-                        if ($stmt->expr->class instanceof Node\Name) {
-                            $assignments[] = '$' . $varName . ' = new ' . $stmt->expr->class->toString();
+                if ($stmt->cases) {
+                    foreach ($stmt->cases as $case) {
+                        if ($case->stmts) {
+                            $this->scanStatements($case->stmts, $serviceCalls, $assignments, $throws, $returns, $controlFlow);
                         }
                     }
                 }
             }
-            
-            // Recursively scan nested statements
-            if ($stmt !== null && is_object($stmt)) {
-                $properties = get_object_vars($stmt);
-                foreach ($properties as $prop) {
-                    if (is_array($prop)) {
-                        $this->scanStatements($prop, $serviceCalls, $assignments, $throws, $returns, $controlFlow);
-                    } elseif ($prop instanceof Node) {
-                        $this->scanStatements([$prop], $serviceCalls, $assignments, $throws, $returns, $controlFlow);
+
+            // Try-catch-finally
+            if ($stmt instanceof Node\Stmt\TryCatch) {
+                if ($stmt->stmts) {
+                    $this->scanStatements($stmt->stmts, $serviceCalls, $assignments, $throws, $returns, $controlFlow);
+                }
+                if ($stmt->catches) {
+                    foreach ($stmt->catches as $catch) {
+                        if ($catch->stmts) {
+                            $this->scanStatements($catch->stmts, $serviceCalls, $assignments, $throws, $returns, $controlFlow);
+                        }
+                    }
+                }
+                if ($stmt->finally && $stmt->finally->stmts) {
+                    $this->scanStatements($stmt->finally->stmts, $serviceCalls, $assignments, $throws, $returns, $controlFlow);
+                }
+            }
+
+            // Expression statements (wraps expressions as statements)
+            if ($stmt instanceof Node\Stmt\Expression) {
+                $expr = $stmt->expr;
+
+                // Service calls like $this->service->method()
+                if ($expr instanceof Node\Expr\MethodCall) {
+                    if ($expr->var instanceof Node\Expr\PropertyFetch) {
+                        $prop = $expr->var->name instanceof Node\Identifier ?
+                            $expr->var->name->toString() : '?';
+                        $method = $expr->name instanceof Node\Identifier ?
+                            $expr->name->toString() : '?';
+                        $serviceCalls[] = '$this->' . $prop . '->' . $method . '()';
+                    }
+                }
+
+                // Assignments
+                if ($expr instanceof Node\Expr\Assign) {
+                    if ($expr->var instanceof Node\Expr\Variable && is_string($expr->var->name)) {
+                        $varName = $expr->var->name;
+                        if ($expr->expr instanceof Node\Expr\MethodCall) {
+                            $assignments[] = '$' . $varName . ' = ...';
+                        } elseif ($expr->expr instanceof Node\Expr\New_) {
+                            if ($expr->expr->class instanceof Node\Name) {
+                                $assignments[] = '$' . $varName . ' = new ' . $expr->expr->class->toString();
+                            }
+                        }
                     }
                 }
             }
