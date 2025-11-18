@@ -616,7 +616,8 @@ class ContextFormatter
 
                     $callsLine = implode(', ', $formattedCalls);
                     if (count($callCounts) > $limit) {
-                        $callsLine .= ', ...';
+                        $remaining = count($callCounts) - $limit;
+                        $callsLine .= ', +' . $remaining;
                     }
 
                     $output[] = "  → `\$this->{$service}`: {$callsLine}";
