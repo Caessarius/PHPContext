@@ -3,6 +3,7 @@
 namespace ContextExtractor;
 
 use PhpParser\Node;
+use PhpParser\NodeTraverser;
 use PhpParser\NodeVisitorAbstract;
 
 class MetadataVisitor extends NodeVisitorAbstract
@@ -36,12 +37,20 @@ class MetadataVisitor extends NodeVisitorAbstract
             }
         } elseif ($node instanceof Node\Stmt\Class_) {
             $this->extractClass($node);
+            // Don't traverse children - we handle everything in extractClass
+            return NodeTraverser::DONT_TRAVERSE_CHILDREN;
         } elseif ($node instanceof Node\Stmt\Interface_) {
             $this->extractInterface($node);
+            // Don't traverse children - we handle everything in extractInterface
+            return NodeTraverser::DONT_TRAVERSE_CHILDREN;
         } elseif ($node instanceof Node\Stmt\Trait_) {
             $this->extractTrait($node);
+            // Don't traverse children - we handle everything in extractTrait
+            return NodeTraverser::DONT_TRAVERSE_CHILDREN;
         } elseif ($node instanceof Node\Stmt\Enum_) {
             $this->extractEnum($node);
+            // Don't traverse children - we handle everything in extractEnum
+            return NodeTraverser::DONT_TRAVERSE_CHILDREN;
         }
 
         return null;
