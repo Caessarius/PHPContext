@@ -123,14 +123,14 @@ class MetadataExtractor
     private function analyzeDependencies(array $data): array
     {
         $deps = [];
-        
+
         foreach ($data['classes'] as $class) {
             $classDeps = array_merge(
                 $class['extends'] ?? [],
                 $class['implements'] ?? [],
                 $class['uses'] ?? []
             );
-            
+
             foreach ($classDeps as $dep) {
                 if (!isset($deps[$dep])) {
                     $deps[$dep] = [];
@@ -138,9 +138,14 @@ class MetadataExtractor
                 $deps[$dep][] = $class['fqcn'];
             }
         }
-        
-        arsort($deps, SORT_NUMERIC);
-        return array_map(fn($d) => array_unique($d), $deps);
+
+        // Deduplicate usages first
+        $deps = array_map(fn($d) => array_unique($d), $deps);
+
+        // Sort by usage count in descending order
+        uasort($deps, fn($a, $b) => count($b) <=> count($a));
+
+        return $deps;
     }
 
     private function detectPatterns(array $data): array
