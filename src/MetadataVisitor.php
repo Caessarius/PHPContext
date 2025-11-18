@@ -617,8 +617,11 @@ class MetadataVisitor extends NodeVisitorAbstract
             if ($node->expr instanceof Node) {
                 $this->scanNodeForInstanceOf($node->expr, $deps);
             }
-        } elseif ($node instanceof Node\Expr\BinaryOp) {
-            // For binary operations (including instanceof), check both sides
+        } elseif ($node instanceof Node\Expr\BinaryOp\BooleanAnd ||
+                  $node instanceof Node\Expr\BinaryOp\BooleanOr ||
+                  $node instanceof Node\Expr\BinaryOp\LogicalAnd ||
+                  $node instanceof Node\Expr\BinaryOp\LogicalOr) {
+            // Only recurse into logical binary operations where instanceof might appear
             if ($node->left instanceof Node) {
                 $this->scanNodeForInstanceOf($node->left, $deps);
             }
