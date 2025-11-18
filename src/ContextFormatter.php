@@ -56,6 +56,7 @@ class ContextFormatter
                 'max_properties_per_class' => 15,
                 'max_pattern_classes' => 20,
                 'max_dependencies' => 15,
+                'max_class_constants' => 20,
                 'max_magic_strings' => 15,
                 'max_magic_numbers' => 10,
                 'max_array_keys' => 15,
@@ -227,11 +228,12 @@ class ContextFormatter
         
         if ($this->options['magic_values']['class_constants'] && $allConstants) {
             $output[] = "### Class Constants";
-            foreach (array_slice($allConstants, 0, 20) as $const) {
+            $limit = $this->options['limits']['max_class_constants'];
+            foreach (array_slice($allConstants, 0, $limit) as $const) {
                 $output[] = "- `{$const['class']}::{$const['name']}` = {$const['value']}";
             }
-            if (count($allConstants) > 20) {
-                $output[] = "- *... and " . (count($allConstants) - 20) . " more*";
+            if (count($allConstants) > $limit) {
+                $output[] = "- *... and " . (count($allConstants) - $limit) . " more*";
             }
             $output[] = "";
         }
@@ -479,9 +481,8 @@ class ContextFormatter
         if (!empty($interface['extends'])) {
             $output[] = "**Extends:** `" . implode('`, `', $interface['extends']) . "`";
         }
-        
+
         if (!empty($interface['methods'])) {
-            $output[] = "";
             $output[] = "**Methods:**";
             foreach ($interface['methods'] as $method) {
                 $output = array_merge($output, $this->formatMethodSignature($method));
