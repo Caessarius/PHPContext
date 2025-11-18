@@ -544,7 +544,8 @@ class MetadataVisitor extends NodeVisitorAbstract
             // Scan arguments for magic values
             if ($node->args) {
                 foreach ($node->args as $arg) {
-                    if ($arg->value instanceof Node) {
+                    // Skip VariadicPlaceholder nodes (PHP 8.1+ named arguments)
+                    if ($arg instanceof Node\Arg && $arg->value instanceof Node) {
                         $this->scanNodeForMagicValues($arg->value, $magicValues);
                     }
                 }
@@ -763,7 +764,10 @@ class MetadataVisitor extends NodeVisitorAbstract
                 if ($attr->args) {
                     $args = [];
                     foreach ($attr->args as $arg) {
-                        $args[] = $this->getConstantValue($arg->value);
+                        // Skip VariadicPlaceholder nodes (PHP 8.1+ named arguments)
+                        if ($arg instanceof Node\Arg) {
+                            $args[] = $this->getConstantValue($arg->value);
+                        }
                     }
                     $attrData['args'] = $args;
                 }
