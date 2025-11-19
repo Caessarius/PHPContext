@@ -18,8 +18,6 @@ class ContextFormatter
             'files_analyzed' => false,
             'magic_values' => [
                 'class_constants' => true,
-                'magic_strings' => true,
-                'magic_numbers' => true,
                 'array_keys' => true,
             ],
             'class_details' => [
@@ -57,8 +55,6 @@ class ContextFormatter
                 'max_pattern_classes' => 20,
                 'max_dependencies' => 15,
                 'max_class_constants' => 20,
-                'max_magic_strings' => 15,
-                'max_magic_numbers' => 10,
                 'max_array_keys' => 15,
                 'max_body_patterns_service_calls' => 10,
             ],
@@ -239,7 +235,7 @@ class ContextFormatter
         $output = [];
         $output[] = "## Constants & Magic Values";
         $output[] = "";
-        
+
         // Collect all class constants
         $allConstants = [];
         foreach ($metadata['classes'] as $class) {
@@ -253,7 +249,7 @@ class ContextFormatter
                 }
             }
         }
-        
+
         if ($this->options['magic_values']['class_constants'] && $allConstants) {
             $output[] = "### Class Constants";
             $limit = $this->options['limits']['max_class_constants'];
@@ -265,60 +261,18 @@ class ContextFormatter
             }
             $output[] = "";
         }
-        
-        // Collect magic values
-        $allMagicStrings = [];
-        $allMagicNumbers = [];
+
+        // Collect array keys
         $allArrayKeys = [];
-        
+
         foreach ($metadata['classes'] as $class) {
-            if (!empty($class['magic_values']['strings'])) {
-                foreach ($class['magic_values']['strings'] as $str) {
-                    $allMagicStrings[$str][] = $class['name'];
-                }
-            }
-            if (!empty($class['magic_values']['numbers'])) {
-                foreach ($class['magic_values']['numbers'] as $num) {
-                    $allMagicNumbers[$num][] = $class['name'];
-                }
-            }
             if (!empty($class['magic_values']['array_keys'])) {
                 foreach ($class['magic_values']['array_keys'] as $key) {
                     $allArrayKeys[$key][] = $class['name'];
                 }
             }
         }
-        
-        if ($this->options['magic_values']['magic_strings'] && $allMagicStrings) {
-            $output[] = "### Magic Strings";
-            $limit = $this->options['limits']['max_magic_strings'];
-            $count = 0;
-            foreach ($allMagicStrings as $str => $classes) {
-                if ($count++ >= $limit) break;
-                $classList = implode(', ', array_slice(array_unique($classes), 0, 3));
-                if (count($classes) > 3) {
-                    $classList .= ', +' . (count($classes) - 3);
-                }
-                $output[] = "- `\"{$str}\"` (in: {$classList})";
-            }
-            $output[] = "";
-        }
-        
-        if ($this->options['magic_values']['magic_numbers'] && $allMagicNumbers) {
-            $output[] = "### Magic Numbers";
-            $limit = $this->options['limits']['max_magic_numbers'];
-            $count = 0;
-            foreach ($allMagicNumbers as $num => $classes) {
-                if ($count++ >= $limit) break;
-                $classList = implode(', ', array_slice(array_unique($classes), 0, 3));
-                if (count($classes) > 3) {
-                    $classList .= ', +' . (count($classes) - 3);
-                }
-                $output[] = "- `{$num}` (in: {$classList})";
-            }
-            $output[] = "";
-        }
-        
+
         if ($this->options['magic_values']['array_keys'] && $allArrayKeys) {
             $output[] = "### Common Array Keys";
             $limit = $this->options['limits']['max_array_keys'];
@@ -333,7 +287,7 @@ class ContextFormatter
             }
             $output[] = "";
         }
-        
+
         $output[] = "";
         return $output;
     }

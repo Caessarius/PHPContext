@@ -176,8 +176,6 @@ $config = [
     // Constants & Magic Values subsections.
     'magic_values' => [
       'class_constants' => TRUE,
-      'magic_strings' => FALSE,  // Disabled by default for security
-      'magic_numbers' => FALSE,  // Disabled by default - low utility
       'array_keys' => TRUE,
     ],
 
@@ -225,8 +223,6 @@ $config = [
       'max_pattern_classes' => 20,
       'max_dependencies' => 15,
       'max_class_constants' => 20,
-      'max_magic_strings' => 15,
-      'max_magic_numbers' => 10,
       'max_array_keys' => 15,
       'max_body_patterns_service_calls' => 10,
     ],
@@ -245,7 +241,6 @@ for ($i = 1; $i < $argc; $i++) {
     echo "  --full                   Remove most limits for detailed output\n";
     echo "  --minimal                Minimal output for large projects\n";
     echo "  --exclude=<path>         Add exclusion path (can be repeated)\n";
-    echo "  --include-magic-values   Include magic strings/numbers (disabled by default)\n";
     echo "  --suppress-warnings      Suppress security warnings\n";
     echo "  --help, -h              Show this help message\n\n";
     echo "Security:\n";
@@ -271,8 +266,6 @@ for ($i = 3; $i < $argc; $i++) {
       'max_pattern_classes' => 200,
       'max_dependencies' => 100,
       'max_class_constants' => 200,
-      'max_magic_strings' => 100,
-      'max_magic_numbers' => 100,
       'max_array_keys' => 100,
       'max_body_patterns_service_calls' => 50,
     ];
@@ -286,10 +279,6 @@ for ($i = 3; $i < $argc; $i++) {
     $config['options']['class_details']['properties'] = FALSE;
     $config['options']['method_details']['body_patterns'] = FALSE;
     $config['options']['limits']['max_methods_per_class'] = 10;
-  } elseif ($argv[$i] === '--include-magic-values') {
-    // Enable magic strings and numbers (disabled by default)
-    $config['options']['magic_values']['magic_strings'] = TRUE;
-    $config['options']['magic_values']['magic_numbers'] = TRUE;
   } elseif ($argv[$i] === '--suppress-warnings') {
     // Suppress security warnings
     $suppressWarnings = TRUE;

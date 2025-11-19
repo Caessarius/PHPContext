@@ -393,42 +393,25 @@ class MetadataVisitor extends NodeVisitorAbstract
     private function extractMagicValues(Node\Stmt\Class_ $node): array
     {
         $magicValues = [
-            'strings' => [],
-            'numbers' => [],
             'array_keys' => [],
         ];
-        
+
         foreach ($node->getMethods() as $method) {
             if ($method->stmts) {
                 $this->findMagicValues($method->stmts, $magicValues);
             }
         }
-        
+
         // Count occurrences and filter
         $result = [];
-        
-        // Strings used more than once
-        $stringCounts = array_count_values($magicValues['strings']);
-        arsort($stringCounts);
-        $frequentStrings = array_filter($stringCounts, fn($c) => $c > 1);
-        if ($frequentStrings) {
-            $result['strings'] = array_slice(array_keys($frequentStrings), 0, 10);
-        }
-        
-        // Significant numbers (not 0, 1, -1)
-        $numbers = array_unique($magicValues['numbers']);
-        $numbers = array_filter($numbers, fn($n) => !in_array($n, [0, 1, -1, '0', '1', '-1']));
-        if ($numbers) {
-            $result['numbers'] = array_slice($numbers, 0, 10);
-        }
-        
+
         // Common array keys
         $keysCounts = array_count_values($magicValues['array_keys']);
         arsort($keysCounts);
         if ($keysCounts) {
             $result['array_keys'] = array_slice(array_keys($keysCounts), 0, 10);
         }
-        
+
         return $result;
     }
 
@@ -443,57 +426,8 @@ class MetadataVisitor extends NodeVisitorAbstract
         }
     }
 
-    /**
-     * Check if a string contains sensitive information.
-     *
-     * @param string $str The string to check
-     * @return bool True if sensitive
-     */
-    private function isSensitiveString(string $str): bool
-    {
-        $sensitivePatterns = [
-            '/password/i',
-            '/secret/i',
-            '/api[_-]?key/i',
-            '/token/i',
-            '/credential/i',
-            '/auth/i',
-            '/private[_-]?key/i',
-            '/bearer/i',
-            '/jwt/i',
-            '/session/i',
-            '/cookie/i',
-            '/encryption/i',
-            '/decrypt/i',
-        ];
-
-        foreach ($sensitivePatterns as $pattern) {
-            if (preg_match($pattern, $str)) {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
     private function scanNodeForMagicValues(Node $node, array &$magicValues): void
     {
-        // String literals in various contexts
-        if ($node instanceof Node\Scalar\String_) {
-            $value = $node->value;
-            // Filter out very long strings, URLs, and sensitive strings
-            if (strlen($value) < 50 &&
-                !preg_match('#^https?://#', $value) &&
-                !$this->isSensitiveString($value)) {
-                $magicValues['strings'][] = $value;
-            }
-        }
-
-        // Numeric literals (excluding common ones)
-        if ($node instanceof Node\Scalar\Int_ || $node instanceof Node\Scalar\Float_) {
-            $magicValues['numbers'][] = (string)$node->value;
-        }
-
         // Array key access
         if ($node instanceof Node\Expr\ArrayDimFetch) {
             if ($node->dim instanceof Node\Scalar\String_) {
@@ -576,7 +510,7 @@ class MetadataVisitor extends NodeVisitorAbstract
             }
         } elseif ($node instanceof Node\Expr\MethodCall || $node instanceof Node\Expr\FuncCall ||
                   $node instanceof Node\Expr\StaticCall) {
-            // Scan arguments for magic values
+            // Scan arguments for array keys
             if ($node->args) {
                 foreach ($node->args as $arg) {
                     // Skip VariadicPlaceholder nodes (PHP 8.1+ named arguments)

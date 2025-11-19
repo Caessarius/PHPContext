@@ -20,7 +20,7 @@ Token-efficient PHP metadata extraction using `nikic/php-parser` for AI assistan
 - Include in public documentation
 
 ### ✅ RECOMMENDED:
-- Add CONTEXT.md to `.gitignore` (see `.gitignore.recommended`)
+- Add CONTEXT.md to `.gitignore` (already configured in project .gitignore)
 - Review output before sharing with anyone
 - Use only with trusted/self-hosted AI assistants
 - Keep in private/internal documentation only
@@ -28,10 +28,8 @@ Token-efficient PHP metadata extraction using `nikic/php-parser` for AI assistan
 ### 🔒 Security Features:
 - **Path validation**: Only relative paths allowed (no absolute paths)
 - **Sanitization**: Output is sanitized to prevent markdown/XSS injection
-- **Sensitive detection**: Magic strings containing passwords/keys/tokens are filtered
 - **Resource limits**: Memory and execution time limits prevent DoS
 - **Symlink protection**: Symlinks outside project root are rejected
-- **Magic values disabled**: Strings/numbers disabled by default (enable with `--include-magic-values`)
 
 ---
 
@@ -110,9 +108,6 @@ scripts/phpcontext/extract.php src CONTEXT.md --full
 # Minimal (large projects)
 scripts/phpcontext/extract.php src CONTEXT.md --minimal
 
-# Include magic strings/numbers (disabled by default)
-scripts/phpcontext/extract.php src CONTEXT.md --include-magic-values
-
 # Custom exclusions (supports glob patterns)
 scripts/phpcontext/extract.php src CONTEXT.md --exclude=Migrations/
 
@@ -129,8 +124,10 @@ scripts/phpcontext/extract.php web/modules/custom output/CUSTOM_CONTEXT.md
 scripts/phpcontext/extract.php web/modules/custom/my_module MODULE_CONTEXT.md
 ```
 
-### New CLI Options:
-- `--include-magic-values` - Enable magic strings/numbers (disabled by default)
+### CLI Options:
+- `--full` - Remove most limits for detailed output
+- `--minimal` - Minimal output for large projects
+- `--exclude=<path>` - Add exclusion path (can be repeated)
 - `--suppress-warnings` - Suppress security warnings
 - `--help` or `-h` - Show help message
 
@@ -150,8 +147,6 @@ scripts/phpcontext/extract.php web/modules/custom/my_module MODULE_CONTEXT.md
     // Constants & Magic Values subsections
     'magic_values' => [
         'class_constants' => true,
-        'magic_strings' => false,  // Disabled by default (security + low utility)
-        'magic_numbers' => false,  // Disabled by default (low utility for AI)
         'array_keys' => true,
     ],
 
@@ -198,9 +193,9 @@ scripts/phpcontext/extract.php web/modules/custom/my_module MODULE_CONTEXT.md
         'max_properties_per_class' => 15,
         'max_pattern_classes' => 20,
         'max_dependencies' => 15,
-        'max_magic_strings' => 15,
-        'max_magic_numbers' => 10,
+        'max_class_constants' => 20,
         'max_array_keys' => 15,
+        'max_body_patterns_service_calls' => 10,
     ],
 ];
 ```
