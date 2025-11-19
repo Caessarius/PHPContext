@@ -1,0 +1,23 @@
+# Dependencies
+/vendor/
+
+# IDE/Editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Generated context files (SENSITIVE!)
+/context/*.md
+CONTEXT.md
+*_CONTEXT.md
+*.context.md
+
+# Temporary files
+*.tmp
+*.bak
