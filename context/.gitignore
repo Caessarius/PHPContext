@@ -1,0 +1,5 @@
+# Ignore all context files - they contain sensitive information
+*
+
+# But keep this .gitignore file
+!.gitignore

@@ -443,13 +443,48 @@ class MetadataVisitor extends NodeVisitorAbstract
         }
     }
 
+    /**
+     * Check if a string contains sensitive information.
+     *
+     * @param string $str The string to check
+     * @return bool True if sensitive
+     */
+    private function isSensitiveString(string $str): bool
+    {
+        $sensitivePatterns = [
+            '/password/i',
+            '/secret/i',
+            '/api[_-]?key/i',
+            '/token/i',
+            '/credential/i',
+            '/auth/i',
+            '/private[_-]?key/i',
+            '/bearer/i',
+            '/jwt/i',
+            '/session/i',
+            '/cookie/i',
+            '/encryption/i',
+            '/decrypt/i',
+        ];
+
+        foreach ($sensitivePatterns as $pattern) {
+            if (preg_match($pattern, $str)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     private function scanNodeForMagicValues(Node $node, array &$magicValues): void
     {
         // String literals in various contexts
         if ($node instanceof Node\Scalar\String_) {
             $value = $node->value;
-            // Filter out very long strings and URLs
-            if (strlen($value) < 50 && !preg_match('#^https?://#', $value)) {
+            // Filter out very long strings, URLs, and sensitive strings
+            if (strlen($value) < 50 &&
+                !preg_match('#^https?://#', $value) &&
+                !$this->isSensitiveString($value)) {
                 $magicValues['strings'][] = $value;
             }
         }

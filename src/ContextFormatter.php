@@ -67,17 +67,45 @@ class ContextFormatter
         $this->options = array_replace_recursive($defaults, $options);
     }
 
+    /**
+     * Sanitizes markdown content to prevent injection attacks.
+     *
+     * @param string $text The text to sanitize
+     * @return string The sanitized text
+     */
+    private function sanitizeMarkdown(string $text): string
+    {
+        // Escape HTML special characters
+        $text = htmlspecialchars($text, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+
+        // Remove malicious markdown patterns
+        $text = preg_replace('/\[([^\]]+)\]\(javascript:[^\)]*\)/', '[$1](BLOCKED)', $text);
+        $text = preg_replace('/<script[^>]*>.*?<\/script>/is', '[SCRIPT_BLOCKED]', $text);
+        $text = preg_replace('/<iframe[^>]*>.*?<\/iframe>/is', '[IFRAME_BLOCKED]', $text);
+
+        // Limit line length to prevent DoS
+        $lines = explode("\n", $text);
+        $lines = array_map(function($line) {
+            return strlen($line) > 500 ? substr($line, 0, 500) . '...' : $line;
+        }, $lines);
+
+        return implode("\n", $lines);
+    }
+
     public function format(array $metadata): string
     {
         $output = [];
-        
-        // Header
+
+        // Header with security warning
         $output[] = "# Code Context Reference";
+        $output[] = "";
+        $output[] = "> ⚠️ **CONFIDENTIAL** - This file contains internal architecture details.";
+        $output[] = "> Do NOT commit to public repositories or share publicly without review.";
         $output[] = "";
         $output[] = "**Generated:** " . date('Y-m-d H:i:s');
         $output[] = "**Files Analyzed:** {$metadata['summary']['files_analyzed']}";
         $output[] = "";
-        
+
         // Summary
         if ($this->options['summary']) {
             $output[] = "## Summary";
@@ -325,9 +353,9 @@ class ContextFormatter
         $output[] = $header;
         $output[] = "";
         
-        // Docblock summary
+        // Docblock summary (sanitized)
         if (!empty($class['docblock']['summary'])) {
-            $output[] = "**Description:** " . $class['docblock']['summary'];
+            $output[] = "**Description:** " . $this->sanitizeMarkdown($class['docblock']['summary']);
         }
         
         // Attributes
@@ -420,7 +448,7 @@ class ContextFormatter
             foreach ($class['constants'] as $const) {
                 $line = "- `{$const['name']} = {$const['value']}`";
                 if (!empty($const['docblock']['summary'])) {
-                    $line .= " - {$const['docblock']['summary']}";
+                    $line .= " - " . $this->sanitizeMarkdown($const['docblock']['summary']);
                 }
                 $output[] = $line;
             }
@@ -440,7 +468,7 @@ class ContextFormatter
                 }
                 $line .= "`";
                 if (!empty($prop['docblock']['summary'])) {
-                    $line .= " - {$prop['docblock']['summary']}";
+                    $line .= " - " . $this->sanitizeMarkdown($prop['docblock']['summary']);
                 }
                 $output[] = $line;
             }
@@ -471,9 +499,9 @@ class ContextFormatter
         $output[] = "### `{$interface['name']}`";
         $output[] = "";
         
-        // Docblock summary
+        // Docblock summary (sanitized)
         if (!empty($interface['docblock']['summary'])) {
-            $output[] = "**Description:** " . $interface['docblock']['summary'];
+            $output[] = "**Description:** " . $this->sanitizeMarkdown($interface['docblock']['summary']);
         }
         
         $output[] = "**FQCN:** `{$interface['fqcn']}`";
@@ -572,9 +600,9 @@ class ContextFormatter
         $line .= "`";
         $output[] = $line;
         
-        // Docblock summary
+        // Docblock summary (sanitized)
         if ($this->options['method_details']['docblock_summary'] && !empty($method['docblock']['summary'])) {
-            $output[] = "  *{$method['docblock']['summary']}*";
+            $output[] = "  *" . $this->sanitizeMarkdown($method['docblock']['summary']) . "*";
         }
         
         // Attributes

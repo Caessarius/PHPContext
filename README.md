@@ -2,6 +2,38 @@
 
 Token-efficient PHP metadata extraction using `nikic/php-parser` for AI assistants.
 
+---
+
+## ⚠️ SECURITY WARNING
+
+**CONTEXT.md contains SENSITIVE information about your codebase:**
+- Internal file paths and directory structure
+- Complete class names and architecture details
+- Dependency information and versions
+- Array keys and configuration patterns
+- Public API surface and method signatures
+
+### ❌ DO NOT:
+- Commit to public repositories
+- Share with untrusted parties
+- Upload to public AI services without review
+- Include in public documentation
+
+### ✅ RECOMMENDED:
+- Add CONTEXT.md to `.gitignore` (see `.gitignore.recommended`)
+- Review output before sharing with anyone
+- Use only with trusted/self-hosted AI assistants
+- Keep in private/internal documentation only
+
+### 🔒 Security Features:
+- **Path validation**: Only relative paths allowed (no absolute paths)
+- **Sanitization**: Output is sanitized to prevent markdown/XSS injection
+- **Sensitive detection**: Magic strings containing passwords/keys/tokens are filtered
+- **Resource limits**: Memory and execution time limits prevent DoS
+- **Symlink protection**: Symlinks outside project root are rejected
+- **Magic values disabled**: Strings/numbers disabled by default (enable with `--include-magic-values`)
+
+---
 
 ## Requirements
 
@@ -60,28 +92,47 @@ scripts/phpcontext/extract.php --help 2>&1 | head -5
 
 ## Usage
 
-```bash
-# Basic
-scripts/phpcontext/extract.php /path/to/src CONTEXT.md
+**IMPORTANT**: All paths must be **relative** to project root. Absolute paths are rejected for security.
 
-# Full detail (no truncation)
-scripts/phpcontext/extract.php src/ CONTEXT.md --full
+```bash
+# Help
+scripts/phpcontext/extract.php --help
+
+# Basic (scans current directory, outputs to context/CONTEXT.md)
+scripts/phpcontext/extract.php
+
+# Scan specific directory
+scripts/phpcontext/extract.php src context/CONTEXT.md
+
+# Full detail (high limits, not infinite)
+scripts/phpcontext/extract.php src CONTEXT.md --full
 
 # Minimal (large projects)
-scripts/phpcontext/extract.php src/ CONTEXT.md --minimal
+scripts/phpcontext/extract.php src CONTEXT.md --minimal
 
-# Custom exclusions
-scripts/phpcontext/extract.php src/ CONTEXT.md --exclude=Migrations/
+# Include magic strings/numbers (disabled by default)
+scripts/phpcontext/extract.php src CONTEXT.md --include-magic-values
 
-# Additional exclusions
-scripts/phpcontext/extract.php /path/to/project CONTEXT.md --exclude=migrations/ --exclude=fixtures/
+# Custom exclusions (supports glob patterns)
+scripts/phpcontext/extract.php src CONTEXT.md --exclude=Migrations/
+
+# Multiple exclusions
+scripts/phpcontext/extract.php src CONTEXT.md --exclude=migrations/ --exclude=fixtures/
+
+# Suppress security warnings
+scripts/phpcontext/extract.php src CONTEXT.md --suppress-warnings
 
 # Drupal custom modules
-scripts/phpcontext/extract.php web/modules/custom CUSTOM_CONTEXT.md
+scripts/phpcontext/extract.php web/modules/custom output/CUSTOM_CONTEXT.md
 
 # Drupal specific module
 scripts/phpcontext/extract.php web/modules/custom/my_module MODULE_CONTEXT.md
 ```
+
+### New CLI Options:
+- `--include-magic-values` - Enable magic strings/numbers (disabled by default)
+- `--suppress-warnings` - Suppress security warnings
+- `--help` or `-h` - Show help message
 
 
 ## Configuration
@@ -99,8 +150,8 @@ scripts/phpcontext/extract.php web/modules/custom/my_module MODULE_CONTEXT.md
     // Constants & Magic Values subsections
     'magic_values' => [
         'class_constants' => true,
-        'magic_strings' => true,
-        'magic_numbers' => true,
+        'magic_strings' => false,  // Disabled by default (security + low utility)
+        'magic_numbers' => false,  // Disabled by default (low utility for AI)
         'array_keys' => true,
     ],
 
