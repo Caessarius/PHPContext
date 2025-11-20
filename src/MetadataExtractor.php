@@ -47,8 +47,14 @@ class MetadataExtractor
         array $excludePaths
     ): void {
         $iterator = new \RecursiveIteratorIterator(
-            new \RecursiveDirectoryIterator($directory, \RecursiveDirectoryIterator::SKIP_DOTS)
+            new \RecursiveDirectoryIterator(
+                $directory,
+                \RecursiveDirectoryIterator::SKIP_DOTS
+            ),
+            \RecursiveIteratorIterator::SELF_FIRST
         );
+
+        $realDirectory = realpath($directory);
 
         foreach ($iterator as $file) {
             if ($file->getExtension() !== 'php') {
@@ -56,27 +62,68 @@ class MetadataExtractor
             }
 
             $filepath = $file->getPathname();
-            
-            // Check exclusions
-            foreach ($excludePaths as $exclude) {
-                if (str_contains($filepath, $exclude)) {
-                    continue 2;
+
+            // Security: Check for symlink attacks
+            if ($file->isLink()) {
+                $realPath = realpath($filepath);
+                // Skip symlinks that point outside the scanned directory
+                if ($realPath === false || strpos($realPath, $realDirectory) !== 0) {
+                    error_log("Skipped symlink outside directory: {$filepath}");
+                    continue;
                 }
+            }
+
+            // Check exclusions with improved logic
+            if ($this->isExcluded($filepath, $excludePaths)) {
+                continue;
             }
 
             try {
                 $code = file_get_contents($filepath);
                 $stmts = $parser->parse($code);
-                
+
                 if ($stmts) {
                     $visitor->setCurrentFile($filepath);
                     $traverser->traverse($stmts);
                     $this->files[] = $filepath;
                 }
             } catch (Error $e) {
-                error_log("Parse error in {$filepath}: " . $e->getMessage());
+                // Log parse errors without exposing full paths in production
+                $relativePath = str_replace($realDirectory . DIRECTORY_SEPARATOR, '', $filepath);
+                error_log("Parse error in {$relativePath}: " . $e->getMessage());
             }
         }
+    }
+
+    /**
+     * Check if a file path should be excluded.
+     *
+     * @param string $filepath The file path to check
+     * @param array $excludePaths Array of exclusion patterns
+     * @return bool True if should be excluded
+     */
+    private function isExcluded(string $filepath, array $excludePaths): bool
+    {
+        // Normalize path for comparison
+        $normalizedPath = str_replace('\\', '/', $filepath);
+
+        foreach ($excludePaths as $exclude) {
+            $exclude = str_replace('\\', '/', $exclude);
+
+            // Support for glob patterns
+            if (strpos($exclude, '*') !== false) {
+                if (fnmatch($exclude, $normalizedPath)) {
+                    return true;
+                }
+            } else {
+                // Substring match (original behavior)
+                if (str_contains($normalizedPath, $exclude)) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
     }
 
     private function aggregateMetadata(MetadataVisitor $visitor): array

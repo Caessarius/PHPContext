@@ -18,8 +18,6 @@ class ContextFormatter
             'files_analyzed' => false,
             'magic_values' => [
                 'class_constants' => true,
-                'magic_strings' => true,
-                'magic_numbers' => true,
                 'array_keys' => true,
             ],
             'class_details' => [
@@ -57,8 +55,6 @@ class ContextFormatter
                 'max_pattern_classes' => 20,
                 'max_dependencies' => 15,
                 'max_class_constants' => 20,
-                'max_magic_strings' => 15,
-                'max_magic_numbers' => 10,
                 'max_array_keys' => 15,
                 'max_body_patterns_service_calls' => 10,
             ],
@@ -67,17 +63,45 @@ class ContextFormatter
         $this->options = array_replace_recursive($defaults, $options);
     }
 
+    /**
+     * Sanitizes markdown content to prevent injection attacks.
+     *
+     * @param string $text The text to sanitize
+     * @return string The sanitized text
+     */
+    private function sanitizeMarkdown(string $text): string
+    {
+        // Escape HTML special characters
+        $text = htmlspecialchars($text, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+
+        // Remove malicious markdown patterns
+        $text = preg_replace('/\[([^\]]+)\]\(javascript:[^\)]*\)/', '[$1](BLOCKED)', $text);
+        $text = preg_replace('/<script[^>]*>.*?<\/script>/is', '[SCRIPT_BLOCKED]', $text);
+        $text = preg_replace('/<iframe[^>]*>.*?<\/iframe>/is', '[IFRAME_BLOCKED]', $text);
+
+        // Limit line length to prevent DoS
+        $lines = explode("\n", $text);
+        $lines = array_map(function($line) {
+            return strlen($line) > 500 ? substr($line, 0, 500) . '...' : $line;
+        }, $lines);
+
+        return implode("\n", $lines);
+    }
+
     public function format(array $metadata): string
     {
         $output = [];
-        
-        // Header
+
+        // Header with security warning
         $output[] = "# Code Context Reference";
+        $output[] = "";
+        $output[] = "> ⚠️ **CONFIDENTIAL** - This file contains internal architecture details.";
+        $output[] = "> Do NOT commit to public repositories or share publicly without review.";
         $output[] = "";
         $output[] = "**Generated:** " . date('Y-m-d H:i:s');
         $output[] = "**Files Analyzed:** {$metadata['summary']['files_analyzed']}";
         $output[] = "";
-        
+
         // Summary
         if ($this->options['summary']) {
             $output[] = "## Summary";
@@ -211,7 +235,7 @@ class ContextFormatter
         $output = [];
         $output[] = "## Constants & Magic Values";
         $output[] = "";
-        
+
         // Collect all class constants
         $allConstants = [];
         foreach ($metadata['classes'] as $class) {
@@ -225,7 +249,7 @@ class ContextFormatter
                 }
             }
         }
-        
+
         if ($this->options['magic_values']['class_constants'] && $allConstants) {
             $output[] = "### Class Constants";
             $limit = $this->options['limits']['max_class_constants'];
@@ -237,60 +261,18 @@ class ContextFormatter
             }
             $output[] = "";
         }
-        
-        // Collect magic values
-        $allMagicStrings = [];
-        $allMagicNumbers = [];
+
+        // Collect array keys
         $allArrayKeys = [];
-        
+
         foreach ($metadata['classes'] as $class) {
-            if (!empty($class['magic_values']['strings'])) {
-                foreach ($class['magic_values']['strings'] as $str) {
-                    $allMagicStrings[$str][] = $class['name'];
-                }
-            }
-            if (!empty($class['magic_values']['numbers'])) {
-                foreach ($class['magic_values']['numbers'] as $num) {
-                    $allMagicNumbers[$num][] = $class['name'];
-                }
-            }
             if (!empty($class['magic_values']['array_keys'])) {
                 foreach ($class['magic_values']['array_keys'] as $key) {
                     $allArrayKeys[$key][] = $class['name'];
                 }
             }
         }
-        
-        if ($this->options['magic_values']['magic_strings'] && $allMagicStrings) {
-            $output[] = "### Magic Strings";
-            $limit = $this->options['limits']['max_magic_strings'];
-            $count = 0;
-            foreach ($allMagicStrings as $str => $classes) {
-                if ($count++ >= $limit) break;
-                $classList = implode(', ', array_slice(array_unique($classes), 0, 3));
-                if (count($classes) > 3) {
-                    $classList .= ', +' . (count($classes) - 3);
-                }
-                $output[] = "- `\"{$str}\"` (in: {$classList})";
-            }
-            $output[] = "";
-        }
-        
-        if ($this->options['magic_values']['magic_numbers'] && $allMagicNumbers) {
-            $output[] = "### Magic Numbers";
-            $limit = $this->options['limits']['max_magic_numbers'];
-            $count = 0;
-            foreach ($allMagicNumbers as $num => $classes) {
-                if ($count++ >= $limit) break;
-                $classList = implode(', ', array_slice(array_unique($classes), 0, 3));
-                if (count($classes) > 3) {
-                    $classList .= ', +' . (count($classes) - 3);
-                }
-                $output[] = "- `{$num}` (in: {$classList})";
-            }
-            $output[] = "";
-        }
-        
+
         if ($this->options['magic_values']['array_keys'] && $allArrayKeys) {
             $output[] = "### Common Array Keys";
             $limit = $this->options['limits']['max_array_keys'];
@@ -305,7 +287,7 @@ class ContextFormatter
             }
             $output[] = "";
         }
-        
+
         $output[] = "";
         return $output;
     }
@@ -325,9 +307,9 @@ class ContextFormatter
         $output[] = $header;
         $output[] = "";
         
-        // Docblock summary
+        // Docblock summary (sanitized)
         if (!empty($class['docblock']['summary'])) {
-            $output[] = "**Description:** " . $class['docblock']['summary'];
+            $output[] = "**Description:** " . $this->sanitizeMarkdown($class['docblock']['summary']);
         }
         
         // Attributes
@@ -420,7 +402,7 @@ class ContextFormatter
             foreach ($class['constants'] as $const) {
                 $line = "- `{$const['name']} = {$const['value']}`";
                 if (!empty($const['docblock']['summary'])) {
-                    $line .= " - {$const['docblock']['summary']}";
+                    $line .= " - " . $this->sanitizeMarkdown($const['docblock']['summary']);
                 }
                 $output[] = $line;
             }
@@ -440,7 +422,7 @@ class ContextFormatter
                 }
                 $line .= "`";
                 if (!empty($prop['docblock']['summary'])) {
-                    $line .= " - {$prop['docblock']['summary']}";
+                    $line .= " - " . $this->sanitizeMarkdown($prop['docblock']['summary']);
                 }
                 $output[] = $line;
             }
@@ -471,9 +453,9 @@ class ContextFormatter
         $output[] = "### `{$interface['name']}`";
         $output[] = "";
         
-        // Docblock summary
+        // Docblock summary (sanitized)
         if (!empty($interface['docblock']['summary'])) {
-            $output[] = "**Description:** " . $interface['docblock']['summary'];
+            $output[] = "**Description:** " . $this->sanitizeMarkdown($interface['docblock']['summary']);
         }
         
         $output[] = "**FQCN:** `{$interface['fqcn']}`";
@@ -572,9 +554,9 @@ class ContextFormatter
         $line .= "`";
         $output[] = $line;
         
-        // Docblock summary
+        // Docblock summary (sanitized)
         if ($this->options['method_details']['docblock_summary'] && !empty($method['docblock']['summary'])) {
-            $output[] = "  *{$method['docblock']['summary']}*";
+            $output[] = "  *" . $this->sanitizeMarkdown($method['docblock']['summary']) . "*";
         }
         
         // Attributes

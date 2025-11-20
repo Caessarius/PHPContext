@@ -1,0 +1,29 @@
+# PHPContext - Generated files (SENSITIVE!)
+# These files contain internal architecture details and should NOT be committed
+
+# Dependencies
+/vendor/
+composer.lock
+
+# Generated context files (SENSITIVE!)
+/context/
+CONTEXT.md
+*_CONTEXT.md
+*.context.md
+**/*CONTEXT*.md
+**/context/*.md
+
+# Temporary files
+*.tmp
+*.bak
+
+# IDE/Editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
