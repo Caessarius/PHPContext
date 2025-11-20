@@ -189,12 +189,12 @@ scripts/phpcontext/extract.php web/modules/custom/my_module MODULE_CONTEXT.md
 
     // Limits
     'limits' => [
-        'max_methods_per_class' => PHP_INT_MAX,
-        'max_properties_per_class' => 15,
-        'max_pattern_classes' => 20,
-        'max_dependencies' => 15,
-        'max_class_constants' => 20,
-        'max_array_keys' => 15,
+        'max_methods_per_class' => 100,
+        'max_properties_per_class' => 25,
+        'max_pattern_classes' => 25,
+        'max_dependencies' => 50,
+        'max_class_constants' => 25,
+        'max_array_keys' => 25,
         'max_body_patterns_service_calls' => 10,
     ],
 ];
@@ -218,18 +218,16 @@ Automatically detects common patterns:
 **Drupal:**
 ```php
 'limits' => [
-    'max_methods_per_class' => 15,      // Verbose classes
-    'max_properties_per_class' => 10,
-    'max_magic_strings' => 20,          // Config keys
+    'max_methods_per_class' => 20,      // Verbose classes
+    'max_properties_per_class' => 20,
 ]
 ```
 
 **Symfony:**
 ```php
 'limits' => [
-    'max_methods_per_class' => 12,
-    'max_properties_per_class' => 12,
-    'max_magic_strings' => 12,
+    'max_methods_per_class' => 15,
+    'max_properties_per_class' => 15,
 ]
 ```
 
@@ -237,8 +235,8 @@ Automatically detects common patterns:
 ```php
 'limits' => [
     'max_methods_per_class' => 10,
-    'max_properties_per_class' => 20,   // Large entities
-    'max_dependencies' => 25,           // Complex DI
+    'max_properties_per_class' => 30,   // Large entities
+    'max_dependencies' => 50,           // Complex DI
 ]
 ```
 
@@ -265,12 +263,10 @@ Ranked by reduction in hallucinations:
 11. **array_keys** - Config patterns
 12. **properties** - State structure
 13. **control_flow** - Logic complexity
-14. **magic_strings** - Hard-coded values
 
 ### ⚪ Optional (3-2/10)
-15. **default_values** - Initial state
-16. **magic_numbers** - Numeric literals
-17. **namespace_structure** - Organization
+14. **default_values** - Initial state
+15. **namespace_structure** - Organization
 
 
 ## Extracted Metadata
