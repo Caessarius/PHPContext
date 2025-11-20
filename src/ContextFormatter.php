@@ -59,7 +59,7 @@ class ContextFormatter
                 'max_body_patterns_service_calls' => 10,
             ],
         ];
-        
+
         $this->options = array_replace_recursive($defaults, $options);
     }
 
@@ -113,7 +113,7 @@ class ContextFormatter
             $output[] = "";
             $output[] = "";
         }
-        
+
         // Architecture patterns
         if ($this->options['architecture_patterns'] && !empty($metadata['patterns'])) {
             $output[] = "## Architecture Patterns";
@@ -131,12 +131,12 @@ class ContextFormatter
             }
             $output[] = "";
         }
-        
+
         // Constants & Magic Values
         if ($this->options['constants_magic_values']) {
             $output = array_merge($output, $this->formatConstantsAndMagicValues($metadata));
         }
-        
+
         // Key dependencies
         if ($this->options['key_dependencies'] && !empty($metadata['dependencies'])) {
             $output[] = "## Key Dependencies";
@@ -147,16 +147,19 @@ class ContextFormatter
                 $count = count($usages);
                 $output[] = "- `{$dep}` ({$count} usage" . ($count > 1 ? 's' : '') . ")";
             }
+            if (count($metadata['dependencies']) > $limit) {
+                $output[] = "- *... and " . (count($metadata['dependencies']) - $limit) . " more*";
+            }
             $output[] = "";
             $output[] = "";
         }
-        
+
         // Namespace overview
         if ($this->options['namespace_structure'] && !empty($metadata['namespaces'])) {
             $output[] = "## Namespace Structure";
             $output[] = "";
             foreach ($metadata['namespaces'] as $ns => $types) {
-                $total = count($types['classes']) + count($types['interfaces']) + 
+                $total = count($types['classes']) + count($types['interfaces']) +
                          count($types['traits']) + count($types['enums']);
                 if ($total > 0) {
                     $output[] = "### `{$ns}`";
@@ -177,7 +180,7 @@ class ContextFormatter
             }
             $output[] = "";
         }
-        
+
         // Classes detail
         if (!empty($metadata['classes'])) {
             $output[] = "## Classes";
@@ -186,7 +189,7 @@ class ContextFormatter
                 $output = array_merge($output, $this->formatClass($class));
             }
         }
-        
+
         // Interfaces
         if (!empty($metadata['interfaces'])) {
             $output[] = "## Interfaces";
@@ -195,7 +198,7 @@ class ContextFormatter
                 $output = array_merge($output, $this->formatInterface($interface));
             }
         }
-        
+
         // Traits
         if (!empty($metadata['traits'])) {
             $output[] = "## Traits";
@@ -204,7 +207,7 @@ class ContextFormatter
                 $output = array_merge($output, $this->formatTrait($trait));
             }
         }
-        
+
         // Enums
         if (!empty($metadata['enums'])) {
             $output[] = "## Enums";
@@ -213,7 +216,7 @@ class ContextFormatter
                 $output = array_merge($output, $this->formatEnum($enum));
             }
         }
-        
+
         // File list (optional)
         if ($this->options['files_analyzed'] && !empty($metadata['files'])) {
             $output[] = "";
@@ -226,7 +229,7 @@ class ContextFormatter
             }
             $output[] = "";
         }
-        
+
         return implode("\n", $output);
     }
 
@@ -285,6 +288,9 @@ class ContextFormatter
                 }
                 $output[] = "- `'{$key}'` (in: {$classList})";
             }
+            if (count($allArrayKeys) > $limit) {
+                $output[] = "- *... and " . (count($allArrayKeys) - $limit) . " more*";
+            }
             $output[] = "";
         }
 
@@ -295,23 +301,23 @@ class ContextFormatter
     private function formatClass(array $class): array
     {
         $output = [];
-        
+
         $modifiers = [];
         if ($class['abstract']) $modifiers[] = 'abstract';
         if ($class['final']) $modifiers[] = 'final';
-        
+
         $header = "### `{$class['name']}`";
         if ($modifiers) {
             $header .= " *(" . implode(', ', $modifiers) . ")*";
         }
         $output[] = $header;
         $output[] = "";
-        
+
         // Docblock summary (sanitized)
         if (!empty($class['docblock']['summary'])) {
             $output[] = "**Description:** " . $this->sanitizeMarkdown($class['docblock']['summary']);
         }
-        
+
         // Attributes
         if (!empty($class['attributes'])) {
             $attrs = [];
@@ -324,12 +330,12 @@ class ContextFormatter
             }
             $output[] = "**Attributes:** `" . implode('`, `', $attrs) . "`";
         }
-        
+
         // Annotations from docblock (Drupal plugins)
         if (!empty($class['docblock']['annotations'])) {
             $importantAnnotations = array_intersect_key(
                 $class['docblock']['annotations'],
-                array_flip(['Plugin', 'Block', 'CommercePaymentGateway', 'WebformElement', 
+                array_flip(['Plugin', 'Block', 'CommercePaymentGateway', 'WebformElement',
                            'FormElement', 'Action', 'Condition', 'Entity', 'ContentEntityType'])
             );
             if ($importantAnnotations) {
@@ -350,31 +356,31 @@ class ContextFormatter
                 }
             }
         }
-        
+
         $output[] = "**FQCN:** `{$class['fqcn']}`";
-        
+
         if (!empty($class['extends'])) {
             $output[] = "**Extends:** `" . implode('`, `', $class['extends']) . "`";
         }
-        
+
         if (!empty($class['implements'])) {
             $output[] = "**Implements:** `" . implode('`, `', $class['implements']) . "`";
         }
-        
+
         if (!empty($class['traits_used'])) {
             $output[] = "**Uses Traits:** `" . implode('`, `', $class['traits_used']) . "`";
         }
-        
+
         // Show ALL type dependencies (no truncation)
         if (!empty($class['type_dependencies'])) {
             $output[] = "**Type Dependencies:** `" . implode('`, `', $class['type_dependencies']) . "`";
         }
-        
+
         // Constructor injection order
         if (!empty($class['constructor_injection'])) {
             $output[] = "**Constructor Injection:** `" . implode('` → `', $class['constructor_injection']) . "`";
         }
-        
+
         // Public API surface with signatures
         if (!empty($class['public_api'])) {
             $output[] = "**Public API:**";
@@ -395,7 +401,7 @@ class ContextFormatter
                 }
             }
         }
-        
+
         // Constants with values
         if (!empty($class['constants'])) {
             $output[] = "**Constants:**";
@@ -407,7 +413,7 @@ class ContextFormatter
                 $output[] = $line;
             }
         }
-        
+
         // Properties with defaults
         if ($this->options['class_details']['properties'] && !empty($class['properties'])) {
             $output[] = "**Properties:**";
@@ -430,7 +436,7 @@ class ContextFormatter
                 $output[] = "- *... " . (count($class['properties']) - $limit) . " more*";
             }
         }
-        
+
         // Methods
         if ($this->options['class_details']['methods'] && !empty($class['methods'])) {
             $output[] = "**Methods:**";
@@ -442,7 +448,7 @@ class ContextFormatter
                 $output[] = "- *... " . (count($class['methods']) - $maxMethods) . " more*";
             }
         }
-        
+
         $output[] = "";
         return $output;
     }
@@ -452,14 +458,14 @@ class ContextFormatter
         $output = [];
         $output[] = "### `{$interface['name']}`";
         $output[] = "";
-        
+
         // Docblock summary (sanitized)
         if (!empty($interface['docblock']['summary'])) {
             $output[] = "**Description:** " . $this->sanitizeMarkdown($interface['docblock']['summary']);
         }
-        
+
         $output[] = "**FQCN:** `{$interface['fqcn']}`";
-        
+
         if (!empty($interface['extends'])) {
             $output[] = "**Extends:** `" . implode('`, `', $interface['extends']) . "`";
         }
@@ -470,7 +476,7 @@ class ContextFormatter
                 $output = array_merge($output, $this->formatMethodSignature($method));
             }
         }
-        
+
         $output[] = "";
         $output[] = "";
         return $output;
@@ -482,15 +488,14 @@ class ContextFormatter
         $output[] = "### `{$trait['name']}`";
         $output[] = "";
         $output[] = "**FQCN:** `{$trait['fqcn']}`";
-        
+
         if (!empty($trait['methods'])) {
-            $output[] = "";
             $output[] = "**Methods:**";
             foreach ($trait['methods'] as $method) {
                 $output = array_merge($output, $this->formatMethodSignature($method));
             }
         }
-        
+
         $output[] = "";
         $output[] = "";
         return $output;
@@ -502,19 +507,19 @@ class ContextFormatter
         $output[] = "### `{$enum['name']}`";
         $output[] = "";
         $output[] = "**FQCN:** `{$enum['fqcn']}`";
-        
+
         if (isset($enum['type'])) {
             $output[] = "**Type:** `{$enum['type']}`";
         }
-        
+
         if (!empty($enum['implements'])) {
             $output[] = "**Implements:** `" . implode('`, `', $enum['implements']) . "`";
         }
-        
+
         if (!empty($enum['cases'])) {
             $output[] = "**Cases:** `" . implode('`, `', $enum['cases']) . "`";
         }
-        
+
         $output[] = "";
         $output[] = "";
         return $output;
@@ -523,15 +528,15 @@ class ContextFormatter
     private function formatMethodSignature(array $method): array
     {
         $output = [];
-        
+
         $line = "- `{$method['visibility']}";
-        
+
         if ($method['static']) $line .= " static";
         if ($method['abstract']) $line .= " abstract";
         if ($method['final']) $line .= " final";
-        
+
         $line .= " {$method['name']}(";
-        
+
         if ($this->options['method_details']['parameters'] && !empty($method['params'])) {
             $params = [];
             foreach ($method['params'] as $param) {
@@ -544,21 +549,21 @@ class ContextFormatter
             }
             $line .= implode(', ', $params);
         }
-        
+
         $line .= ")";
-        
+
         if ($this->options['method_details']['return_type'] && isset($method['return'])) {
             $line .= ": {$method['return']}";
         }
-        
+
         $line .= "`";
         $output[] = $line;
-        
+
         // Docblock summary (sanitized)
         if ($this->options['method_details']['docblock_summary'] && !empty($method['docblock']['summary'])) {
             $output[] = "  *" . $this->sanitizeMarkdown($method['docblock']['summary']) . "*";
         }
-        
+
         // Attributes
         if ($this->options['method_details']['attributes'] && !empty($method['attributes'])) {
             $attrs = [];
@@ -571,7 +576,7 @@ class ContextFormatter
             }
             $output[] = "  `" . implode(' ', $attrs) . "`";
         }
-        
+
         // Body patterns
         if ($this->options['method_details']['body_patterns'] && !empty($method['body_patterns'])) {
             // Service calls
@@ -606,23 +611,23 @@ class ContextFormatter
                     $output[] = "  → `\$this->{$service}`: {$callsLine}";
                 }
             }
-            
+
             // Throws
             if ($this->options['body_patterns']['throws'] && !empty($method['body_patterns']['throws'])) {
                 $output[] = "  ⚠ Throws: `" . implode('`, `', $method['body_patterns']['throws']) . "`";
             }
-            
+
             // Control flow
             if ($this->options['body_patterns']['control_flow'] && !empty($method['body_patterns']['control_flow'])) {
                 $output[] = "  ⚙ Control: " . implode(', ', $method['body_patterns']['control_flow']);
             }
-            
+
             // Returns
             if ($this->options['body_patterns']['returns'] && !empty($method['body_patterns']['returns'])) {
                 $output[] = "  ← Returns: `" . implode('`, `', $method['body_patterns']['returns']) . "`";
             }
         }
-        
+
         return $output;
     }
 }
