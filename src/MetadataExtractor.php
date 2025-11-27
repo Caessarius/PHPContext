@@ -62,6 +62,16 @@ class MetadataExtractor {
   private array $processedFqcns = [];
 
   /**
+   * Dependency depth tracking.
+   *
+   * Tracks at which depth each dependency was first discovered.
+   * Format: ['FQCN' => depth]
+   *
+   * @var array
+   */
+  private array $dependencyDepths = [];
+
+  /**
    * Composer ClassLoader instance for PSR-4 resolution.
    *
    * @var object|null
@@ -240,7 +250,7 @@ class MetadataExtractor {
       return $this->projectType;
     }
 
-    // Symfony: check for symfony/symfony, symfony/kernel, or config/bundles.php.
+    // Symfony: check for symfony/symfony, symfony/kernel or config/bundles.php.
     if (file_exists("{$cwd}/config/bundles.php") ||
         file_exists("{$cwd}/symfony.lock") ||
         $this->checkComposerPackage('symfony/symfony') ||
@@ -329,13 +339,18 @@ class MetadataExtractor {
     $processedInThisRound = [];
 
     foreach ($newDependencies as $depFqcn) {
+      // Track depth at first discovery.
+      if (!isset($this->dependencyDepths[$depFqcn])) {
+        $this->dependencyDepths[$depFqcn] = $currentDepth;
+      }
+
       // Skip if already processed.
       if (in_array($depFqcn, $this->processedFqcns)) {
         continue;
       }
 
-      // Apply scope filter.
-      if (!$this->shouldFollowDependency($depFqcn, $metadata)) {
+      // Apply scope filter (only for depth > 0).
+      if (!$this->shouldFollowDependency($depFqcn, $metadata, $currentDepth)) {
         $this->metadata['not_found_dependencies'][$depFqcn] = 'filtered_by_scope';
         $this->processedFqcns[] = $depFqcn;
         continue;
@@ -343,7 +358,7 @@ class MetadataExtractor {
 
       // Try to find and parse the dependency file.
       $depFile = $this->findDependencyFile($depFqcn);
-      if ($depFile && $this->shouldProcessFile($depFile, $excludePaths)) {
+      if ($depFile && $this->shouldProcessFile($depFile, $excludePaths, $currentDepth)) {
         try {
           $code = file_get_contents($depFile);
           $stmts = $parser->parse($code);
@@ -370,7 +385,7 @@ class MetadataExtractor {
             $this->metadata['not_found_dependencies'][$depFqcn] = 'file_not_found';
           }
         }
-        elseif (!$this->shouldProcessFile($depFile, $excludePaths)) {
+        elseif (!$this->shouldProcessFile($depFile, $excludePaths, $currentDepth)) {
           $this->metadata['not_found_dependencies'][$depFqcn] = 'excluded_by_filter';
         }
         $this->processedFqcns[] = $depFqcn;
@@ -454,22 +469,32 @@ class MetadataExtractor {
    * Determine if a dependency should be followed based on scope and filters.
    *
    * Applies internal_only and scope filters (interfaces/abstract/all).
+   * Both filters only apply to depth > 1 (recursive dependencies).
+   * Level 1 dependencies (direct) are always followed (all filters bypassed).
    *
    * @param string $fqcn
    *   Fully qualified class name.
    * @param array $metadata
    *   Current metadata for type checking.
+   * @param int $depth
+   *   Current recursion depth (1 = direct dependencies, 2+ = recursive).
    *
    * @return bool
    *   TRUE if dependency should be followed.
    */
-  private function shouldFollowDependency(string $fqcn, array $metadata): bool {
-    // Apply internal_only filter.
+  private function shouldFollowDependency(string $fqcn, array $metadata, int $depth): bool {
+    // Level 1 (direct dependencies) are always followed.
+    // All filters (internal_only, scope) only apply to depth > 1.
+    if ($depth === 1) {
+      return TRUE;
+    }
+
+    // Apply internal_only filter for depth > 1.
     if ($this->followDependencies['internal_only'] && $this->isVendorClass($fqcn)) {
       return FALSE;
     }
 
-    // Apply scope filter.
+    // Apply scope filter for depth > 1.
     $scope = $this->followDependencies['scope'];
 
     if ($scope === 'all') {
@@ -1201,16 +1226,19 @@ class MetadataExtractor {
    * Applies internal_only check (vendor/) and exclusion patterns.
    * When following dependencies with internal_only=false, vendor/ files
    * are allowed even if vendor/ is in the general exclude list.
+   * The internal_only filter only applies to depth > 1 (recursive deps).
    *
    * @param string $filepath
    *   Absolute file path.
    * @param array $excludePaths
    *   Exclusion patterns.
+   * @param int $depth
+   *   Current recursion depth (1 = direct dependencies, 2+ = recursive).
    *
    * @return bool
    *   TRUE if file should be processed.
    */
-  private function shouldProcessFile(string $filepath, array $excludePaths): bool {
+  private function shouldProcessFile(string $filepath, array $excludePaths, int $depth = 1): bool {
     // Resolve symbolic links and relative paths (../) to get real path.
     // This prevents false vendor detection when autoloader returns paths like
     // 'vendor/composer/../../web/core/lib/Class.php' which resolve to web/core.
@@ -1223,7 +1251,12 @@ class MetadataExtractor {
     $isVendorFile = str_contains($resolvedPath, '/vendor/') ||
       str_contains($resolvedPath, DIRECTORY_SEPARATOR . 'vendor' . DIRECTORY_SEPARATOR);
 
-    // Apply internal_only: skip vendor/.
+    // Level 1 (direct dependencies) bypass internal_only filter for vendor.
+    if ($depth === 1 && $isVendorFile) {
+      return TRUE;
+    }
+
+    // Apply internal_only filter for depth > 1: skip vendor/.
     if ($this->followDependencies['internal_only'] && $isVendorFile) {
       return FALSE;
     }
@@ -1460,6 +1493,7 @@ class MetadataExtractor {
       'traits' => $data['traits'],
       'enums' => $data['enums'],
       'dependencies' => $this->analyzeDependencies($data),
+      'dependency_depths' => $this->dependencyDepths,
       'patterns' => $this->detectPatterns($data),
       'files' => $this->files,
       'not_found_dependencies' => $this->metadata['not_found_dependencies'],

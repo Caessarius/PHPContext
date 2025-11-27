@@ -9,6 +9,11 @@ resource_limits:
 # Default paths to analyze (relative to project root)
 # Can be overridden by CLI arguments or external config
 # All paths must be relative for security
+#paths:
+#  - 'src'
+#  # Add additional paths as needed:
+#  - 'lib'
+#  - 'modules/custom'
 paths: []
 
 # Path exclusions (glob patterns supported)
@@ -45,6 +50,7 @@ follow_dependencies:
   depth: 0
 
   # Scope: what types of dependencies to follow
+  # Scope filter only applies to depth 2+ for controlling recursive explosion
   # Values:
   #   - all: Follow all dependencies (classes, interfaces, abstract classes)
   #   - interfaces: Only follow interfaces
@@ -52,7 +58,7 @@ follow_dependencies:
   #   - interfaces_and_abstract: Follow interfaces and abstract classes (recommended)
   scope: 'interfaces_and_abstract'
 
-  # Only follow internal dependencies (exclude vendor/)
+  # Only follow internal dependencies for depth 2+ (exclude vendor/)
   # true = skip vendor/ classes (recommended for security and performance)
   # false = include vendor/ classes (can significantly increase output size)
   internal_only: true

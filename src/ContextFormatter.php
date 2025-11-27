@@ -251,10 +251,15 @@ class ContextFormatter {
       $output[] = "";
       $limit = $this->options['limits']['max_dependencies'];
       $topDeps = array_slice($metadata['dependencies'], 0, $limit);
+      $depths = $metadata['dependency_depths'] ?? [];
       foreach ($topDeps as $dep => $usages) {
         $count = count($usages);
         $plural = $count > 1 ? 's' : '';
-        $output[] = "- `{$dep}` ({$count} usage{$plural})";
+        $depthInfo = '';
+        if (isset($depths[$dep]) && $depths[$dep] > 1) {
+          $depthInfo = ", depth {$depths[$dep]}";
+        }
+        $output[] = "- `{$dep}` ({$count} usage{$plural}{$depthInfo})";
       }
       if (count($metadata['dependencies']) > $limit) {
         $remaining = count($metadata['dependencies']) - $limit;
@@ -287,25 +292,44 @@ class ContextFormatter {
 
     // Not Found Dependencies section.
     if (!empty($metadata['not_found_dependencies'])) {
-      $output[] = "## Not Found Dependencies";
-      $output[] = "";
-      $output[] = "⚠️  The following dependencies were referenced but could not be extracted:";
-      $output[] = "";
+      // Only show path discovery failures (file_not_found, excluded_by_filter,
+      // parse_error) that are within max_dependencies limit.
+      // Exclude 'filtered_by_scope' as these are intentionally filtered.
+      $limit = $this->options['limits']['max_dependencies'];
+      $topDependencies = array_slice($metadata['dependencies'] ?? [], 0, $limit, TRUE);
+
+      $filteredNotFound = [];
       foreach ($metadata['not_found_dependencies'] as $fqcn => $reason) {
-        $reasonText = match ($reason) {
-          'file_not_found' => 'file not found',
-          'excluded_by_filter' => 'excluded by filter',
-          'filtered_by_scope' => 'filtered by scope',
-          'parse_error' => 'parse error',
-          default => $reason,
-        };
-        $output[] = "- `{$fqcn}` ({$reasonText})";
+        // Only include if it's a real path discovery failure.
+        if ($reason === 'filtered_by_scope') {
+          continue;
+        }
+        // Only include if it's within the max_dependencies limit.
+        if (isset($topDependencies[$fqcn])) {
+          $filteredNotFound[$fqcn] = $reason;
+        }
       }
-      $output[] = "";
-      $output[] = "**Recommendation:** Review search patterns in `config.yaml` if dependencies are missing.";
-      $output[] = "Check `follow_dependencies.search_patterns` for path resolution rules.";
-      $output[] = "";
-      $output[] = "";
+
+      if (!empty($filteredNotFound)) {
+        $output[] = "## Not Found Dependencies";
+        $output[] = "";
+        $output[] = "⚠️  The following dependencies were referenced but could not be extracted:";
+        $output[] = "";
+        foreach ($filteredNotFound as $fqcn => $reason) {
+          $reasonText = match ($reason) {
+            'file_not_found' => 'file not found',
+            'excluded_by_filter' => 'excluded by filter',
+            'parse_error' => 'parse error',
+            default => $reason,
+          };
+          $output[] = "- `{$fqcn}` ({$reasonText})";
+        }
+        $output[] = "";
+        $output[] = "**Recommendation:** Review search patterns in `config.yaml` if dependencies are missing.";
+        $output[] = "Check `follow_dependencies.search_patterns` for path resolution rules.";
+        $output[] = "";
+        $output[] = "";
+      }
     }
 
     // Namespace overview.
@@ -343,7 +367,12 @@ class ContextFormatter {
     if (!empty($metadata['classes'])) {
       $output[] = "## Classes";
       $output[] = "";
-      foreach ($metadata['classes'] as $class) {
+      $orderedClasses = $this->orderTypesByPriority(
+        $metadata['classes'],
+        $metadata['namespaces'] ?? [],
+        $metadata['dependencies'] ?? []
+      );
+      foreach ($orderedClasses as $class) {
         $output = array_merge($output, $this->formatClass($class));
       }
     }
@@ -352,7 +381,12 @@ class ContextFormatter {
     if (!empty($metadata['interfaces'])) {
       $output[] = "## Interfaces";
       $output[] = "";
-      foreach ($metadata['interfaces'] as $interface) {
+      $orderedInterfaces = $this->orderTypesByPriority(
+        $metadata['interfaces'],
+        $metadata['namespaces'] ?? [],
+        $metadata['dependencies'] ?? []
+      );
+      foreach ($orderedInterfaces as $interface) {
         $output = array_merge($output, $this->formatInterface($interface));
       }
     }
@@ -361,7 +395,12 @@ class ContextFormatter {
     if (!empty($metadata['traits'])) {
       $output[] = "## Traits";
       $output[] = "";
-      foreach ($metadata['traits'] as $trait) {
+      $orderedTraits = $this->orderTypesByPriority(
+        $metadata['traits'],
+        $metadata['namespaces'] ?? [],
+        $metadata['dependencies'] ?? []
+      );
+      foreach ($orderedTraits as $trait) {
         $output = array_merge($output, $this->formatTrait($trait));
       }
     }
@@ -370,7 +409,12 @@ class ContextFormatter {
     if (!empty($metadata['enums'])) {
       $output[] = "## Enums";
       $output[] = "";
-      foreach ($metadata['enums'] as $enum) {
+      $orderedEnums = $this->orderTypesByPriority(
+        $metadata['enums'],
+        $metadata['namespaces'] ?? [],
+        $metadata['dependencies'] ?? []
+      );
+      foreach ($orderedEnums as $enum) {
         $output = array_merge($output, $this->formatEnum($enum));
       }
     }
@@ -389,6 +433,70 @@ class ContextFormatter {
     }
 
     return implode("\n", $output);
+  }
+
+  /**
+   * Order types (classes/interfaces/traits/enums) by priority.
+   *
+   * Priority order:
+   * 1. Items from Namespace Structure (all, namespace-grouped)
+   * 2. Items from Key Dependencies (usage-sorted, limited by max_dependencies)
+   *
+   * @param array $types
+   *   Array of type metadata (classes, interfaces, traits, or enums).
+   * @param array $namespaces
+   *   Namespace structure metadata.
+   * @param array $dependencies
+   *   Key dependencies array (FQCN => usages).
+   *
+   * @return array
+   *   Reordered types array.
+   */
+  private function orderTypesByPriority(array $types, array $namespaces, array $dependencies): array {
+    // Build FQCN lookup for types.
+    $typesLookup = [];
+    foreach ($types as $type) {
+      $typesLookup[$type['fqcn']] = $type;
+    }
+
+    // Phase 1: Collect namespace structure FQCNs.
+    $namespaceFqcns = [];
+    foreach ($namespaces as $ns => $nsTypes) {
+      foreach (['classes', 'interfaces', 'traits', 'enums'] as $typeKey) {
+        if (!empty($nsTypes[$typeKey])) {
+          foreach ($nsTypes[$typeKey] as $shortName) {
+            $fqcn = $ns . '\\' . $shortName;
+            $namespaceFqcns[$fqcn] = TRUE;
+          }
+        }
+      }
+    }
+
+    // Phase 2: Get top Key Dependencies (limited by max_dependencies).
+    $limit = $this->options['limits']['max_dependencies'];
+    $topDependencies = array_slice($dependencies, 0, $limit, TRUE);
+
+    // Phase 3: Build ordered output.
+    $ordered = [];
+    $processed = [];
+
+    // First: Add namespace structure items (preserve current order).
+    foreach ($types as $type) {
+      if (isset($namespaceFqcns[$type['fqcn']])) {
+        $ordered[] = $type;
+        $processed[$type['fqcn']] = TRUE;
+      }
+    }
+
+    // Second: Add Key Dependencies items (in dependency order).
+    foreach ($topDependencies as $fqcn => $usages) {
+      if (isset($typesLookup[$fqcn]) && !isset($processed[$fqcn])) {
+        $ordered[] = $typesLookup[$fqcn];
+        $processed[$fqcn] = TRUE;
+      }
+    }
+
+    return $ordered;
   }
 
   /**

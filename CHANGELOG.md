@@ -5,6 +5,36 @@ All notable changes to PHPContext will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.0] - 2025-11-27
+
+### Changed
+- **BREAKING:** Scope filter (`interfaces_and_abstract`, etc.) now only applies to recursive dependencies (depth > 1)
+- **BREAKING:** `internal_only` filter now only applies to recursive dependencies (depth > 1)
+- Direct dependencies (Level 1) are now ALL extracted without any scope or internal_only filtering
+- Classes/Interfaces/Traits/Enums sections now ordered in two phases: Namespace Structure items first, then Key Dependencies items (usage-sorted, limited by max_dependencies)
+- `max_dependencies` limit now consistently controls both Key Dependencies display AND which dependencies get detailed in Classes/Interfaces sections
+
+### Fixed
+- Direct dependencies from vendor packages (Drupal Core, Symfony) now properly extracted when referenced in codebase
+- `shouldProcessFile()` now respects depth parameter - vendor files at depth=1 are always processed
+- Vendor dependencies at depth=1 no longer incorrectly marked as "excluded by filter"
+- Not Found Dependencies section now only shows genuine path discovery failures within max_dependencies limit
+- Removed 'filtered_by_scope' entries from Not Found Dependencies (these are intentional filters, not failures)
+- Classes/Interfaces sections now respect Key Dependencies usage-sorted order after Namespace Structure items
+
+### Added
+- Dependency depth tracking in Key Dependencies section - displays depth level for recursive dependencies (depth > 1)
+- New `dependency_depths` metadata array to track at which level each dependency was discovered
+- New `orderTypesByPriority()` method in ContextFormatter for consistent ordering logic
+- Depth parameter to `shouldFollowDependency()` and `shouldProcessFile()` methods to enable level-based filtering
+
+## [0.5.1] - 2025-11-27
+
+### Fixed
+- **Not Found Dependencies** section now correctly filters out dependencies already in Key Dependencies list
+- Dependencies hidden by `max_dependencies` limit no longer incorrectly appear as "not found"
+- Section is now hidden entirely when all "not found" entries are actually tracked in Key Dependencies
+
 ## [0.5.0] - 2025-11-27
 
 ### Added
