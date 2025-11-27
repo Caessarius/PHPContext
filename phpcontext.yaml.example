@@ -1,65 +1,186 @@
-# PHPContext Project Configuration
-# Place this file in your project root and use: extract.php --config=phpcontext.yaml
+# PHPContext - Project Optimized Configuration
+# Principle: Keep high-impact structural metadata, trim verbose low-value output
+# Place this file in your project root or use: extract.php --config=phpcontext.yaml
 # This file overrides options/limits from config.yaml and extends paths/exclude
 
-# Override output location
-output: 'docs/ARCHITECTURE.md'
+# Resource limits - prevent memory exhaustion and infinite loops
+resource_limits:
+  memory_limit: '512M'
+  time_limit: 300  # seconds (5 minutes)
 
-# Define multiple paths with per-path configuration
-paths:
-  # Analyze core business logic
-  - path: 'src/Core'
-    exclude:
-      - 'Tests/'
-    options:
-      limits:
-        max_methods_per_class: 50
-  
-  # Analyze critical modules only
-  - path: 'src/Modules/Payment'
-  - path: 'src/Modules/Inventory'
-  
-  # Include internal library with minimal detail
-  - path: 'lib/CompanyFramework'
-    options:
-      class_details:
-        properties: false
-        methods: false
-      limits:
-        max_methods_per_class: 10
+# Define multiple paths to analyze with per-path configuration (relative to project root)
+# Can be overridden by CLI arguments
+paths: []
+# paths:
+#   # Analyze core business logic
+#   - path: 'src/Core'
+#     exclude:
+#       - 'Tests/'
+#     options:
+#       limits:
+#         max_methods_per_class: 50
+
+#   # Analyze critical modules only
+#   - path: 'src/Modules/Payment'
+#   - path: 'src/Modules/Inventory'
+
+#   # Include internal library with minimal detail
+#   - path: 'lib/CompanyFramework'
+#     options:
+#       class_details:
+#         properties: false
+#         methods: false
+#       limits:
+#         max_methods_per_class: 10
+
+# Path exclusions (glob patterns supported)
+# These are cumulative with exclusions from config.yaml
+# Excludes are applied before whitelist filtering
+# Aggressive filtering for token economy
+exclude:
+  - 'vendor/'
+  - 'node_modules/'
+  - 'tests/'
+  - 'Test/'
+  - 'Tests/'
+  - '*Test.php'
+  - 'Migrations/'
+  - 'DataFixtures/'
+  - 'fixtures/'
+  - '.git/'
+  - 'var/'
+  - 'cache/'
+  - 'tmp/'
+  - 'scripts/'
+  - 'config/'
+  - 'translations/'
+  - 'assets/'
+
+# Namespace/class whitelist (optional)
+# If defined, only classes matching these patterns are included
+# Supports glob-style patterns: App\Service\*, *Interface, etc.
+# Empty array = no filtering (include all)
+# Applied AFTER exclusions
+# whitelist:
+#   - 'App\Service\*'
+#   - 'App\Entity\*'
+#   - '*Interface'
+#   - '*Repository'
 
 # Follow dependencies configuration (overrides config.yaml)
+# Automatically extract metadata for class dependencies
 follow_dependencies:
-  depth: 1                            # Follow direct dependencies only
-  scope: 'interfaces_and_abstract'    # Only interfaces and abstract classes
-  internal_only: true                 # Skip vendor/
+  # Depth level: how many levels deep to follow
+  # 0 = disabled (default)
+  # 1 = direct dependencies only (recommended)
+  # 2 = dependencies of dependencies (can cause exponential growth)
+  # Values beyond 2 are not recommended
+  depth: 1
 
-# Additional exclusions (cumulative with config.yaml)
-exclude:
-  - 'fixtures/'
-  - '*Test.php'
+  # Scope: what types of dependencies to follow
+  # Values:
+  #   - all: Follow all dependencies (classes, interfaces, abstract classes)
+  #   - interfaces: Only follow interfaces
+  #   - abstract_classes: Only follow abstract classes
+  #   - interfaces_and_abstract: Follow interfaces and abstract classes (recommended)
+  scope: 'interfaces_and_abstract'
 
-# Whitelist: only analyze classes matching these patterns (optional)
-# Empty array = no filtering
-whitelist:
-  - 'App\Service\*'
-  - 'App\Core\*'
-  - '*Interface'
-  - '*Contract'
+  # Only follow internal dependencies (exclude vendor/)
+  # true = skip vendor/ classes (recommended for security and performance)
+  # false = include vendor/ classes (can significantly increase output size)
+  internal_only: true
 
-# Override options
+  # Include built-in PHP classes section in output
+  # false = skip built-in PHP classes entirely (recommended for minimal output)
+  # true = list built-in PHP classes in dedicated section (useful for documentation)
+  include_builtin_php_classes: false
+
+# Output file (relative to project root)
+output: 'context/CONTEXT.md'
+
+# Output options - control what metadata is included
 options:
-  # Disable verbose sections for large codebases
-  architecture_patterns: true
-  constants_magic_values: false
-  
-  # Customize limits
-  limits:
-    max_methods_per_class: 30
-    max_dependencies: 100
-    max_properties_per_class: 20
+  # Top-level sections
+  summary: true                     # Keep: minimal overhead, high orientation value
+  architecture_patterns: true       # Keep: pattern recognition = context understanding
+  constants_magic_values: true      # Keep: prevents magic value hallucinations
+  key_dependencies: true            # Keep: relationship awareness
+  namespace_structure: true         # Keep: navigation/organization
+  files_analyzed: false             # Skip: minimal value, adds tokens
 
-# Resource limits override (if needed)
-resource_limits:
-  memory_limit: '1G'
-  time_limit: 600
+  # Constants & Magic Values
+  magic_values:
+    class_constants: true           # Keep: named values prevent hallucinations
+    array_keys: false               # Skip: mostly noise
+
+  # Class-level details - CRITICAL for hallucination prevention
+  class_details:
+    docblock_summary: true          # Keep: intent clarity
+    plugin_annotations: true        # Keep: CRITICAL for framework behavior
+    attributes: true                # Keep: PHP 8+ metadata
+    inheritance: true               # Keep: CRITICAL - hierarchy errors common
+    type_dependencies: true         # Keep: CRITICAL - type relationship awareness
+    constructor_injection: true     # Keep: DI pattern understanding
+    public_api: true                # Keep: CRITICAL - entry point awareness
+    constants: true                 # Keep: prevents magic values
+    properties: true                # Keep: state structure (moderate limits)
+    methods: true                   # Keep: must have method signatures
+
+  # Method-level details - balanced
+  method_details:
+    docblock_summary: true          # Keep: intent clarity
+    attributes: true                # Keep: framework integration
+    parameters: true                # Keep: CRITICAL - signature precision
+    return_type: true               # Keep: type awareness
+    body_patterns: true             # Keep: behavior hints (with limits)
+
+  # Method body patterns - selective for token economy
+  body_patterns:
+    service_calls: true             # Keep: shows runtime behavior (limited)
+    throws: true                    # Keep: error handling awareness
+    control_flow: false             # Skip: too abstract
+    returns: false                  # Skip: redundant with return_type
+
+  # Property details - minimal
+  property_details:
+    docblock_summary: false         # Skip: method docs more valuable
+    default_values: false           # Skip: low impact
+
+  # Limits - aggressive for token economy while preserving quality
+  limits:
+    max_methods_per_class: 25       # Balanced: covers most classes, trims outliers
+    max_properties_per_class: 15    # Moderate: state overview
+    max_pattern_classes: 15         # Compact pattern sections
+    max_dependencies: 30            # Key relationships only
+    max_builtin_php_classes: 10     # Minimal PHP internals
+    max_class_constants: 15         # Essential constants
+    max_array_keys: 0               # Disabled (array_keys: false)
+    max_body_patterns_service_calls: 5  # Top interactions only
+
+# CLI Presets (applied via --full or --minimal flags)
+presets:
+  # Full detail mode - high limits for comprehensive analysis
+  full:
+    limits:
+      # Override limits with high but reasonable values (not infinite)
+      max_methods_per_class: 200
+      max_properties_per_class: 100
+      max_pattern_classes: 100
+      max_dependencies: 100
+      max_builtin_php_classes: 100
+      max_class_constants: 100
+      max_array_keys: 100
+      max_body_patterns_service_calls: 50
+
+  # Minimal mode - reduced output for large projects
+  minimal:
+    options:
+      architecture_patterns: false
+      constants_magic_values: false
+      class_details:
+        properties: false
+      method_details:
+        body_patterns: false
+    limits:
+      max_methods_per_class: 10
+      max_dependencies: 10
