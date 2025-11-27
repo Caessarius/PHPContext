@@ -1,0 +1,65 @@
+# PHPContext Project Configuration
+# Place this file in your project root and use: extract.php --config=phpcontext.yaml
+# This file overrides options/limits from config.yaml and extends paths/exclude
+
+# Override output location
+output: 'docs/ARCHITECTURE.md'
+
+# Define multiple paths with per-path configuration
+paths:
+  # Analyze core business logic
+  - path: 'src/Core'
+    exclude:
+      - 'Tests/'
+    options:
+      limits:
+        max_methods_per_class: 50
+  
+  # Analyze critical modules only
+  - path: 'src/Modules/Payment'
+  - path: 'src/Modules/Inventory'
+  
+  # Include internal library with minimal detail
+  - path: 'lib/CompanyFramework'
+    options:
+      class_details:
+        properties: false
+        methods: false
+      limits:
+        max_methods_per_class: 10
+
+# Follow dependencies configuration (overrides config.yaml)
+follow_dependencies:
+  depth: 1                            # Follow direct dependencies only
+  scope: 'interfaces_and_abstract'    # Only interfaces and abstract classes
+  internal_only: true                 # Skip vendor/
+
+# Additional exclusions (cumulative with config.yaml)
+exclude:
+  - 'fixtures/'
+  - '*Test.php'
+
+# Whitelist: only analyze classes matching these patterns (optional)
+# Empty array = no filtering
+whitelist:
+  - 'App\Service\*'
+  - 'App\Core\*'
+  - '*Interface'
+  - '*Contract'
+
+# Override options
+options:
+  # Disable verbose sections for large codebases
+  architecture_patterns: true
+  constants_magic_values: false
+  
+  # Customize limits
+  limits:
+    max_methods_per_class: 30
+    max_dependencies: 100
+    max_properties_per_class: 20
+
+# Resource limits override (if needed)
+resource_limits:
+  memory_limit: '1G'
+  time_limit: 600

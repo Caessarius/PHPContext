@@ -1,0 +1,245 @@
+# PHPContext Configuration
+# This is the default configuration. Override with phpcontext.yaml in project root.
+
+# Resource limits - prevent memory exhaustion and infinite loops
+resource_limits:
+  memory_limit: '512M'
+  time_limit: 300  # seconds (5 minutes)
+
+# Default paths to analyze (relative to project root)
+# Can be overridden by CLI arguments or external config
+# All paths must be relative for security
+paths: []
+
+# Path exclusions (glob patterns supported)
+# These are cumulative with exclusions from external config
+# Excludes are applied before whitelist filtering
+exclude:
+  - 'vendor/'        # Third-party dependencies
+  - 'node_modules/'  # JavaScript dependencies
+  - 'tests/'         # Test files
+  - 'Test/'          # Alternative test directory
+  - '.git/'          # Version control
+  - 'var/'           # Symfony cache/logs
+  - 'cache/'         # Generic cache
+  - 'tmp/'           # Temporary files
+  - 'private/'       # Private files
+  - 'scripts/'       # Build/deployment scripts
+  - 'Migrations/'    # Database migrations
+
+# Namespace/class whitelist (optional)
+# If defined, only classes matching these patterns are included
+# Supports glob-style patterns: App\Service\*, *Interface, etc.
+# Empty array = no filtering (include all)
+# Applied AFTER exclusions
+whitelist: []
+
+# Follow dependencies configuration
+# Automatically extract metadata for class dependencies
+follow_dependencies:
+  # Depth level: how many levels deep to follow
+  # 0 = disabled (default)
+  # 1 = direct dependencies only (recommended)
+  # 2 = dependencies of dependencies (can cause exponential growth)
+  # Values beyond 2 are not recommended
+  depth: 0
+
+  # Scope: what types of dependencies to follow
+  # Values:
+  #   - all: Follow all dependencies (classes, interfaces, abstract classes)
+  #   - interfaces: Only follow interfaces
+  #   - abstract_classes: Only follow abstract classes
+  #   - interfaces_and_abstract: Follow interfaces and abstract classes (recommended)
+  scope: 'interfaces_and_abstract'
+
+  # Only follow internal dependencies (exclude vendor/)
+  # true = skip vendor/ classes (recommended for security and performance)
+  # false = include vendor/ classes (can significantly increase output size)
+  internal_only: true
+
+  # Include built-in PHP classes section in output
+  # false = skip built-in PHP classes entirely (recommended for minimal output)
+  # true = list built-in PHP classes in dedicated section (useful for documentation)
+  # Built-in PHP classes (SPL, DOM, etc.) have no source files but will be
+  # displayed in a separate "Built-in PHP Dependencies" section before Classes
+  include_builtin_php_classes: false
+
+  # Manual file search patterns for resolving class files
+  # These patterns are tried in order when Composer autoloader fails
+  # Supports placeholder tokens: {cwd}, {namespace}, {class}, {path}
+  # Each pattern can specify conditions for when it applies
+  search_patterns:
+    # Drupal core modules (Drupal\MODULE\* → core/modules/MODULE/src/*)
+    - condition: 'starts_with:Drupal\'
+      condition_exclude: ['Drupal\Core\', 'Drupal\Component\']
+      paths:
+        - '{cwd}/web/core/modules/{module}/src/{class_path}'
+        - '{cwd}/core/modules/{module}/src/{class_path}'
+
+    # Drupal Core and Component (Drupal\Core\* → core/lib/Drupal/Core/*)
+    - condition: 'starts_with:Drupal\Core\'
+      paths:
+        - '{cwd}/web/core/lib/{path}'
+        - '{cwd}/core/lib/{path}'
+
+    - condition: 'starts_with:Drupal\Component\'
+      paths:
+        - '{cwd}/web/core/lib/{path}'
+        - '{cwd}/core/lib/{path}'
+
+    # Symfony components (Symfony\Component\* → vendor/symfony/*/*)
+    - condition: 'starts_with:Symfony\'
+      paths:
+        - '{cwd}/vendor/symfony/{component}/{class_path}'
+        - '{cwd}/vendor/symfony/{component}/src/{class_path}'
+        - '{cwd}/web/vendor/symfony/{component}/{class_path}'
+        - '{cwd}/web/vendor/symfony/{component}/src/{class_path}'
+
+    # Drupal contrib modules with submodules (e.g., commerce_order → commerce/modules/order)
+    # Tries package/submodule structure first for modules with underscores
+    - condition: 'starts_with:Drupal\'
+      condition_exclude: ['Drupal\Core\', 'Drupal\Component\']
+      paths:
+        - '{cwd}/web/modules/contrib/{drupal_package}/modules/{drupal_submodule}/src/{class_path}'
+        - '{cwd}/modules/contrib/{drupal_package}/modules/{drupal_submodule}/src/{class_path}'
+
+    # Drupal contrib modules (Drupal\MODULE\* → modules/contrib/MODULE/src/*)
+    - condition: 'starts_with:Drupal\'
+      condition_exclude: ['Drupal\Core\', 'Drupal\Component\']
+      paths:
+        - '{cwd}/web/modules/contrib/{module_lower}/src/{class_path}'
+        - '{cwd}/modules/contrib/{module_lower}/src/{class_path}'
+
+    # Drupal custom modules (Drupal\MODULE\* → modules/custom/MODULE/src/*)
+    - condition: 'starts_with:Drupal\'
+      condition_exclude: ['Drupal\Core\', 'Drupal\Component\']
+      paths:
+        - '{cwd}/web/modules/custom/{module_lower}/src/{class_path}'
+        - '{cwd}/modules/custom/{module_lower}/src/{class_path}'
+
+    # OroPlatform (Oro\Bundle\* → vendor/oro/platform/src/*)
+    - condition: 'starts_with:Oro\Bundle\'
+      paths:
+        - '{cwd}/vendor/oro/platform/src/{path}'
+        - '{cwd}/src/{path}'
+
+    # Doctrine (Doctrine\* → vendor/doctrine/*/lib/Doctrine/* or */src/*)
+    - condition: 'starts_with:Doctrine\'
+      paths:
+        - '{cwd}/vendor/doctrine/{package}/lib/{path}'
+        - '{cwd}/vendor/doctrine/{package}/src/{class_path}'
+
+    # Guzzle (GuzzleHttp\* → vendor/guzzlehttp/*/src/*)
+    - condition: 'starts_with:GuzzleHttp\'
+      paths:
+        - '{cwd}/vendor/guzzlehttp/guzzle/src/{class_path}'
+        - '{cwd}/vendor/guzzlehttp/psr7/src/{class_path}'
+
+    # Laravel/Illuminate (Illuminate\* → vendor/laravel/framework/src/Illuminate/*)
+    - condition: 'starts_with:Illuminate\'
+      paths:
+        - '{cwd}/vendor/laravel/framework/src/Illuminate/{class_path}'
+
+    # Standard project locations
+    - condition: 'always'
+      paths:
+        - '{cwd}/src/{path}'
+        - '{cwd}/lib/{path}'
+        - '{cwd}/app/{path}'
+
+    # Generic vendor fallback
+    - condition: 'always'
+      paths:
+        - '{cwd}/vendor/{path}'
+        - '{cwd}/web/vendor/{path}'
+
+# Output file (relative to project root)
+output: 'context/CONTEXT.md'
+
+# Output options - control what metadata is included
+options:
+  # Top-level sections
+  summary: true
+  architecture_patterns: true
+  constants_magic_values: true
+  key_dependencies: true
+  namespace_structure: true
+  files_analyzed: false
+
+  # Constants & Magic Values subsections
+  magic_values:
+    class_constants: true
+    array_keys: true
+
+  # Class-level details
+  class_details:
+    docblock_summary: true
+    plugin_annotations: true    # Drupal/Symfony annotations
+    attributes: true             # PHP 8 attributes
+    inheritance: true            # extends/implements/traits
+    type_dependencies: true      # Type hints and instanceof usage
+    constructor_injection: true  # DI container analysis
+    public_api: true            # Public method signatures
+    constants: true
+    properties: true
+    methods: true
+
+  # Method-level details
+  method_details:
+    docblock_summary: true
+    attributes: true
+    parameters: true
+    return_type: true
+    body_patterns: true
+
+  # Method body patterns
+  body_patterns:
+    service_calls: true      # $this->service->method() calls
+    throws: true             # Exception throwing
+    control_flow: true       # if/for/while/switch
+    returns: true            # Return value patterns
+
+  # Property details
+  property_details:
+    docblock_summary: true
+    default_values: true
+
+  # Limits - prevent excessive output size
+  limits:
+    max_methods_per_class: 100
+    max_properties_per_class: 50
+    max_pattern_classes: 25
+    max_dependencies: 50
+    max_builtin_php_classes: 50
+    max_class_constants: 25
+    max_array_keys: 25
+    max_body_patterns_service_calls: 10
+
+# CLI Presets (applied via --full or --minimal flags)
+# These can be customized per project in phpcontext.yaml
+presets:
+  # Full detail mode - high limits for comprehensive analysis
+  full:
+    limits:
+      # Override limits with high but reasonable values (not infinite)
+      max_methods_per_class: 1000
+      max_properties_per_class: 500
+      max_pattern_classes: 200
+      max_dependencies: 100
+      max_builtin_php_classes: 100
+      max_class_constants: 200
+      max_array_keys: 100
+      max_body_patterns_service_calls: 50
+
+  # Minimal mode - reduced output for large projects
+  minimal:
+    options:
+      architecture_patterns: false
+      constants_magic_values: false
+      class_details:
+        properties: false
+      method_details:
+        body_patterns: false
+    limits:
+      max_methods_per_class: 10
+      max_dependencies: 10
