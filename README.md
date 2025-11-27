@@ -604,47 +604,77 @@ resource_limits:
 
 ---
 
+## Comparison with Competing Approaches
+
+| Approach | PHPContext | RAG | Full Code Context |
+|----------|-----------|-----|-------------------|
+| **Token efficiency** | High (~5-10x reduction) | Variable (query-dependent) | Low |
+| **Setup complexity** | Low (one-time run) | High (vector DB, embeddings) | Trivial |
+| **Relevance** | Fixed, comprehensive | Query-specific | Complete but costly |
+| **Implementation details** | Lost (method bodies) | Retrievable | Full |
+| **Cross-file relationships** | Excellent | Depends on chunking | Poor without tooling |
+| **Best for** | Architecture understanding, refactoring | Large codebases, specific queries | Small projects, debugging |
+
+**When to use PHPContext:**
+- Medium codebases (50-500 classes)
+- Architectural understanding matters more than implementation details
+- Token budget constraints
+- Need consistent, reproducible context across sessions
+
+**When RAG may be better:**
+- Very large codebases (1000+ classes)
+- Need to query specific implementation details
+- Questions vary significantly session-to-session
+
+**When full code context works:**
+- Small projects (<50 classes)
+- Debugging specific issues
+- Token budget is not a concern
+
+---
+
 ## Options Potential Impact on AI Quality
 
-Ranked by reduction potential in hallucinations (Claude's estimates :thinking:):
+Ranked by potential to reduce hallucinations. Impact varies by framework, task type, and codebase quality.
 
-### 🔴 Critical (10-8/10)
-1. **plugin_annotations** - Framework metadata
-   - Config: `options.class_details.plugin_annotations`
-2. **type_dependencies** - Class relationships
-   - Config: `options.class_details.type_dependencies`
-3. **public_api** - Entry points
-   - Config: `options.class_details.public_api`
-4. **constructor_injection** - DI patterns
-   - Config: `options.class_details.constructor_injection`
-5. **inheritance** - extends/implements
-   - Config: `options.class_details.inheritance`
+### 🔴 Critical (9-10/10)
+| Option | Impact | Config Path | Notes |
+|--------|--------|-------------|-------|
+| **inheritance** | 9/10 | `options.class_details.inheritance` | Hierarchy errors are among the most common hallucinations |
+| **type_dependencies** | 9/10 | `options.class_details.type_dependencies` | Prevents wrong type assumptions across classes |
+| **plugin_annotations** | 9/10 | `options.class_details.plugin_annotations` | Critical for Drupal/Symfony; less relevant for vanilla PHP |
 
-### 🟡 High (7-6/10)
-6. **service_calls** - Method behavior
-   - Config: `options.body_patterns.service_calls`
-7. **throws** - Error handling
-   - Config: `options.body_patterns.throws`
-8. **parameters** - Full signatures
-   - Config: `options.method_details.parameters`
-9. **docblock_summary** - Intent
-   - Config: `options.class_details.docblock_summary` and `options.method_details.docblock_summary`
-10. **constants** - Named values
-   - Config: `options.class_details.constants` and `options.magic_values.class_constants`
+### 🟠 High (7-8/10)
+| Option | Impact | Config Path | Notes |
+|--------|--------|-------------|-------|
+| **public_api** | 8/10 | `options.class_details.public_api` | Entry point awareness; impact scales with API complexity |
+| **constructor_injection** | 8/10 | `options.class_details.constructor_injection` | Essential for DI-heavy frameworks |
+| **parameters** | 7/10 | `options.method_details.parameters` | Signature precision prevents API misuse |
+| **throws** | 7/10 | `options.body_patterns.throws` | Error handling context matters for robust code |
 
-### 🟢 Moderate (5-4/10)
-11. **array_keys** - Config patterns
-   - Config: `options.magic_values.array_keys`
-12. **properties** - State structure
-   - Config: `options.class_details.properties`
-13. **control_flow** - Logic complexity
-   - Config: `options.body_patterns.control_flow`
+### 🟡 Moderate (5-6/10)
+| Option | Impact | Config Path | Notes |
+|--------|--------|-------------|-------|
+| **service_calls** | 6/10 | `options.body_patterns.service_calls` | Useful but verbose; diminishing returns quickly |
+| **constants** | 6/10 | `options.class_details.constants` | Prevents magic value hallucinations |
+| **control_flow** | 5/10 | `options.body_patterns.control_flow` | Complexity signals matter for understanding scope |
+| **docblock_summary** | 5/10 | `options.class_details.docblock_summary` | Quality-dependent; garbage-in-garbage-out |
+| **properties** | 5/10 | `options.class_details.properties` | State matters, but methods matter more |
 
-### ⚪ Optional (3-2/10)
-14. **default_values** - Initial state
-   - Config: `options.property_details.default_values`
-15. **namespace_structure** - Organization
-   - Config: `options.namespace_structure`
+### 🟢 Low (2-4/10)
+| Option | Impact | Config Path | Notes |
+|--------|--------|-------------|-------|
+| **namespace_structure** | 4/10 | `options.namespace_structure` | Useful for navigation/organization context |
+| **array_keys** | 3/10 | `options.magic_values.array_keys` | Mostly noise unless config-heavy patterns |
+| **default_values** | 3/10 | `options.property_details.default_values` | Limited practical value |
+
+### For optimal hallucination reduction with token economy:
+
+**Keep enabled:** `inheritance`, `type_dependencies`, `plugin_annotations`, `public_api`, `constructor_injection`, `parameters`, `throws`, `constants`
+
+**Consider disabling:** `array_keys`, `control_flow`, `default_values`, `returns`
+
+---
 
 ## Token Efficiency
 
