@@ -577,6 +577,25 @@ class ContextFormatter {
   }
 
   /**
+   * Sorts methods by visibility (public first, protected, then private).
+   *
+   * @param array $methods
+   *   Array of method metadata.
+   *
+   * @return array
+   *   Sorted methods array.
+   */
+  private function sortMethodsByVisibility(array $methods): array {
+    $visibilityOrder = ['public' => 0, 'protected' => 1, 'private' => 2];
+    usort($methods, function ($a, $b) use ($visibilityOrder) {
+      $orderA = $visibilityOrder[$a['visibility']] ?? 3;
+      $orderB = $visibilityOrder[$b['visibility']] ?? 3;
+      return $orderA <=> $orderB;
+    });
+    return $methods;
+  }
+
+  /**
    * Formats a class definition.
    *
    * @param array $class
@@ -689,7 +708,7 @@ class ContextFormatter {
     }
 
     // Public API surface with signatures.
-    if (!empty($class['public_api'])) {
+    if ($this->options['class_details']['public_api'] && !empty($class['public_api'])) {
       $output[] = "**Public API:**";
       foreach ($class['methods'] as $method) {
         if (in_array($method['name'], $class['public_api'])) {
@@ -755,7 +774,9 @@ class ContextFormatter {
     if ($this->options['class_details']['methods'] && !empty($class['methods'])) {
       $output[] = "**Methods:**";
       $maxMethods = $this->options['limits']['max_methods_per_class'];
-      foreach (array_slice($class['methods'], 0, $maxMethods) as $method) {
+      // Sort methods by visibility: public first, then protected, then private.
+      $sortedMethods = $this->sortMethodsByVisibility($class['methods']);
+      foreach (array_slice($sortedMethods, 0, $maxMethods) as $method) {
         $output = array_merge($output, $this->formatMethodSignature($method));
       }
       if (count($class['methods']) > $maxMethods) {
@@ -898,7 +919,8 @@ class ContextFormatter {
       $params = [];
       foreach ($method['params'] as $param) {
         $p = '';
-        if (isset($param['type'])) {
+        // Always show type, if set.
+        if (!empty($param['type'])) {
           $p .= $param['type'] . ' ';
         }
         $p .= $param['name'];
@@ -925,7 +947,10 @@ class ContextFormatter {
     // Docblock summary (sanitized).
     if ($this->options['method_details']['docblock_summary'] && !empty($method['docblock']['summary'])) {
       $summary = $this->sanitizeMarkdown($method['docblock']['summary']);
-      $output[] = "  *{$summary}*";
+      // Filter out inheritdoc placeholders (provide no useful information).
+      if ($summary !== '{@inheritdoc}' && $summary !== '@inheritdoc') {
+        $output[] = "  *{$summary}*";
+      }
     }
 
     // Attributes.

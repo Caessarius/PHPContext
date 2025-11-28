@@ -5,6 +5,14 @@ All notable changes to PHPContext will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.1] - 2025-11-28
+
+### Fixed
+- `public_api: false` config option now properly respected - added config check before rendering Public API section
+
+### Changed
+- Methods in Classes/Interfaces/Traits sections now sorted by visibility (public → protected → private) for better readability
+
 ## [0.6.0] - 2025-11-27
 
 ### Changed
